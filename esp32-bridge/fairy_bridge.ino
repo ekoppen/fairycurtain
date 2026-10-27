@@ -6,6 +6,9 @@
  * via HTTP krijgt 1-op-1 naar de GATT-characteristic. Notificaties van het
  * gordijn worden in een wachtrij bewaard en via GET /notify opgehaald.
  *
+ * Board: ESP32-C3 Super Mini → "ESP32C3 Dev Module", USB CDC On Boot: Enabled.
+ *        Gewone ESP32/S3/C6 werken ook; ESP32-S2 en ESP8266 niet (geen Bluetooth).
+ *
  * Bibliotheken (Arduino IDE / PlatformIO):
  *   - NimBLE-Arduino (h2zero)  >= 1.4
  *   - ESP32 core (WiFi, WebServer, ESPmDNS zitten erin)
@@ -130,7 +133,12 @@ static void hNotify() {
 
 void setup() {
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA); WiFi.begin(WIFI_SSID, WIFI_PASS);
+  WiFi.mode(WIFI_STA);
+#if CONFIG_IDF_TARGET_ESP32C3
+  // ESP32-C3 Super Mini: keramische antenne hapert op vol vermogen; lager is stabieler.
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+#endif
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status() != WL_CONNECTED) { delay(250); Serial.print("."); }
   Serial.printf("\nWiFi: %s\n", WiFi.localIP().toString().c_str());
   MDNS.begin(MDNS_NAME);
