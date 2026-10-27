@@ -1,0 +1,56 @@
+# Voorbeelden voor Home Assistant.
+# Met MQTT ingeschakeld verschijnt het gordijn vanzelf als light.led_gordijn
+# (+ text.led_gordijn_tekst en button.led_gordijn_stop_animatie).
+# Onderstaande REST-commando's werken ook zónder MQTT.
+
+rest_command:
+  gordijn_tekst:
+    url: "http://192.168.1.50:8321/api/text"
+    method: post
+    content_type: application/json
+    # headers: { X-API-Key: geheim }
+    payload: '{"text": "{{ text }}", "color": "{{ color | default(''#ffffff'') }}", "speed": {{ speed | default(12) }}}'
+  gordijn_afbeelding_url:
+    url: "http://192.168.1.50:8321/api/image/base64"
+    method: post
+    content_type: application/json
+    payload: '{"data": "{{ data }}", "fit": "cover"}'
+  gordijn_preset:
+    url: "http://192.168.1.50:8321/api/preset"
+    method: post
+    content_type: application/json
+    payload: '{"preset": {{ preset }}, "brightness": {{ brightness | default(60) }}}'
+  gordijn_uit:
+    url: "http://192.168.1.50:8321/api/power"
+    method: post
+    content_type: application/json
+    payload: '{"on": false}'
+
+automation:
+  - alias: "Gordijn: Halloween-preset bij zonsondergang"
+    trigger: { platform: sun, event: sunset }
+    action:
+      - service: rest_command.gordijn_preset
+        data: { preset: 20, brightness: 60 }
+
+  - alias: "Gordijn: deurbel toont tekst"
+    trigger: { platform: state, entity_id: binary_sensor.deurbel, to: "on" }
+    action:
+      - service: mqtt.publish
+        data:
+          topic: fairycurtain/cmd/text
+          payload: '{"text": "DING DONG", "color": "#ffcc00", "speed": 18, "loop": false}'
+
+  - alias: "Gordijn: plaatje via MQTT (van URL)"
+    trigger: { platform: state, entity_id: input_boolean.feestmodus, to: "on" }
+    action:
+      - service: mqtt.publish
+        data:
+          topic: fairycurtain/cmd/image
+          payload: '{"url": "http://192.168.1.50:8123/local/pompoen.gif", "brightness": 0.4}'
+
+  - alias: "Gordijn: 's nachts uit"
+    trigger: { platform: time, at: "23:30:00" }
+    action:
+      - service: light.turn_off
+        target: { entity_id: light.led_gordijn }

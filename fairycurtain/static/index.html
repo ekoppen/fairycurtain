@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FairyCurtain</title>
+<style>
+  :root{--bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--fg:#e8e9ec;--mut:#8b919e;--acc:#f2c94c;--ok:#5bd38a;--bad:#ef6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)}
+  header h1{font-size:17px;margin:0;letter-spacing:.3px}
+  #conn{font-size:12px;color:var(--mut)}
+  #conn b{color:var(--bad)} #conn.on b{color:var(--ok)}
+  main{display:grid;grid-template-columns:minmax(300px,520px) 1fr;gap:16px;padding:16px;max-width:1200px}
+  @media(max-width:800px){main{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:0 0 10px}
+  canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:6px;touch-action:none;cursor:crosshair;image-rendering:pixelated}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+  button,select,input[type=text],input[type=number]{background:#22262f;color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:7px 11px;font:inherit}
+  button{cursor:pointer} button:hover{border-color:#3d4452} button.primary{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
+  button.danger{border-color:var(--bad);color:var(--bad)}
+  input[type=color]{width:42px;height:34px;border:none;background:none;padding:0;cursor:pointer}
+  input[type=range]{width:160px}
+  .pal{display:flex;gap:5px;flex-wrap:wrap}
+  .pal span{width:22px;height:22px;border-radius:5px;cursor:pointer;border:1px solid #0006}
+  .muted{color:var(--mut);font-size:12px}
+  #log{font:12px ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:120px;overflow:auto;margin-top:8px}
+  label{display:inline-flex;align-items:center;gap:6px}
+  .stack{display:flex;flex-direction:column;gap:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>✨ FairyCurtain</h1>
+  <span id="conn">verbinding: <b>…</b></span>
+  <span style="flex:1"></span>
+  <a class="muted" href="/docs" target="_blank">API-docs</a>
+</header>
+<main>
+  <div class="stack">
+    <section class="panel">
+      <h2>Tekenen</h2>
+      <canvas id="grid"></canvas>
+      <div class="row">
+        <input type="color" id="color" value="#ff8800">
+        <div class="pal" id="pal"></div>
+      </div>
+      <div class="row">
+        <label><input type="radio" name="tool" value="pen" checked> pen</label>
+        <label><input type="radio" name="tool" value="erase"> gum</label>
+        <label><input type="radio" name="tool" value="fill"> vullen</label>
+        <button id="clearBtn">Leeg</button>
+        <button id="mirrorBtn">Spiegel ↔</button>
+        <span style="flex:1"></span>
+        <button class="primary" id="sendFrame">Stuur naar gordijn</button>
+      </div>
+      <div class="muted">Klik/sleep om te tekenen. Helderheid bij versturen: <input type="range" id="frameBright" min="5" max="100" value="50"> <span id="frameBrightV">50%</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Afbeelding of GIF</h2>
+      <div class="row">
+        <input type="file" id="imgFile" accept="image/*">
+        <select id="fit"><option value="cover">vullen (bijsnijden)</option><option value="contain">passend</option><option value="stretch">uitrekken</option></select>
+        <button id="imgPreview">Voorvertoning</button>
+        <button class="primary" id="imgSend">Versturen</button>
+      </div>
+      <div class="muted">Een geanimeerde GIF wordt als animatie afgespeeld. Een statische afbeelding kun je eerst in het raster laden en bijwerken.</div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Bediening</h2>
+      <div class="row">
+        <button id="onBtn">Aan</button><button id="offBtn">Uit</button>
+        <button id="stopBtn">Stop animatie</button>
+        <label>helderheid <input type="range" id="bright" min="1" max="100" value="100"><span id="brightV">100</span></label>
+      </div>
+      <div class="row">
+        <input type="color" id="solid" value="#4080ff"><button id="solidBtn">Effen kleur</button>
+        <select id="preset"></select><button id="presetBtn">Preset</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Tekst</h2>
+      <div class="row">
+        <input type="text" id="text" placeholder="Hallo!" style="flex:1;min-width:160px">
+        <input type="color" id="textColor" value="#ffffff">
+        <label>snelheid <input type="number" id="speed" value="12" min="1" max="60" style="width:70px"></label>
+        <label><input type="checkbox" id="scroll" checked> scrollen</label>
+        <button class="primary" id="textBtn">Toon</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Kalibratie (layout)</h2>
+      <div class="muted">Licht één fysieke LED op en kijk waar die zit. Pas dan de layout aan tot het raster klopt.</div>
+      <div class="row">
+        <label>index <input type="number" id="pix" value="0" min="0" style="width:80px"></label>
+        <button id="pixPrev">◀</button><button id="pixNext">▶</button><button id="pixGo">Licht op</button>
+        <span class="muted" id="pixHint"></span>
+      </div>
+      <div class="row">
+        <label>breedte <input type="number" id="lw" value="20" style="width:64px"></label>
+        <label>hoogte <input type="number" id="lh" value="20" style="width:64px"></label>
+        <select id="lorder"><option value="column">kolommen (slierten)</option><option value="row">rijen</option></select>
+        <label><input type="checkbox" id="lserp"> serpentine</label>
+        <label><input type="checkbox" id="lfx"> spiegel X</label>
+        <label><input type="checkbox" id="lfy"> spiegel Y</label>
+        <button id="layoutSave">Opslaan</button>
+      </div>
+      <div class="row">
+        <select id="encoder"><option value="indexed_da">encoder: indexed_da</option><option value="plain_rgb">encoder: plain_rgb</option></select>
+        <input type="text" id="rawHex" placeholder="raw hex, bv. aa020101ae" style="width:220px"><button id="rawBtn">Raw sturen</button>
+      </div>
+      <div id="log"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const api=async(p,opt={})=>{const r=await fetch('/api'+p,{headers:{'Content-Type':'application/json'},...opt});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;};
+const log=m=>{const el=$('#log');el.textContent=(new Date().toLocaleTimeString()+'  '+m+'\n'+el.textContent).slice(0,4000)};
+
+let W=20,H=20,grid=[],cv=$('#grid'),ctx=cv.getContext('2d');
+function initGrid(){grid=Array.from({length:H},()=>Array.from({length:W},()=>'#000000'));cv.width=W*20;cv.height=H*20;draw();}
+function draw(){const s=cv.width/W;for(let y=0;y<H;y++)for(let x=0;x<W;x++){ctx.fillStyle=grid[y][x];ctx.fillRect(x*s,y*s,s,s);}ctx.strokeStyle='#ffffff14';for(let i=0;i<=W;i++){ctx.beginPath();ctx.moveTo(i*s,0);ctx.lineTo(i*s,cv.height);ctx.stroke();}for(let i=0;i<=H;i++){ctx.beginPath();ctx.moveTo(0,i*s);ctx.lineTo(cv.width,i*s);ctx.stroke();}}
+function cell(e){const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);return (x>=0&&y>=0&&x<W&&y<H)?[x,y]:null;}
+function fill(x,y,from,to){if(from===to)return;const st=[[x,y]];while(st.length){const[a,b]=st.pop();if(a<0||b<0||a>=W||b>=H||grid[b][a]!==from)continue;grid[b][a]=to;st.push([a+1,b],[a-1,b],[a,b+1],[a,b-1]);}}
+let down=false;
+function paint(e){const c=cell(e);if(!c)return;const[x,y]=c;const tool=document.querySelector('input[name=tool]:checked').value;const col=$('#color').value;
+  if(tool==='fill'){fill(x,y,grid[y][x],col);}else grid[y][x]=tool==='erase'?'#000000':col;draw();}
+cv.addEventListener('pointerdown',e=>{down=true;paint(e)});cv.addEventListener('pointermove',e=>down&&paint(e));window.addEventListener('pointerup',()=>down=false);
+$('#clearBtn').onclick=()=>{initGrid()};
+$('#mirrorBtn').onclick=()=>{grid=grid.map(r=>[...r].reverse());draw()};
+['#ff0000','#ff8800','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff','#ff69b4','#8000ff','#000000'].forEach(c=>{const s=document.createElement('span');s.style.background=c;s.onclick=()=>$('#color').value=c;$('#pal').appendChild(s)});
+$('#frameBright').oninput=e=>$('#frameBrightV').textContent=e.target.value+'%';
+$('#sendFrame').onclick=async()=>{try{const hex=grid.flat();const r=await api('/frame',{method:'POST',body:JSON.stringify({hex,brightness:+$('#frameBright').value/100})});log('frame verstuurd ('+r.packets+' pakketten)')}catch(e){log('fout: '+e.message)}};
+
+// afbeelding → raster (client-side preview)
+$('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return;const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const fit=$('#fit').value;let sx=0,sy=0,sw=img.width,sh=img.height,dx=0,dy=0,dw=W,dh=H;
+  if(fit==='cover'){const r=Math.max(W/sw,H/sh);const w=W/r,h=H/r;sx=(sw-w)/2;sy=(sh-h)/2;sw=w;sh=h;}else if(fit==='contain'){const r=Math.min(W/sw,H/sh);dw=sw*r;dh=sh*r;dx=(W-dw)/2;dy=(H-dh)/2;}
+  x.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);const d=x.getImageData(0,0,W,H).data;for(let y=0;y<H;y++)for(let i=0;i<W;i++){const o=(y*W+i)*4;grid[y][i]='#'+[d[o],d[o+1],d[o+2]].map(v=>v.toString(16).padStart(2,'0')).join('')}draw();URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f)};
+$('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);fd.append('fit',$('#fit').value);fd.append('brightness',+$('#frameBright').value/100);
+  try{const r=await fetch('/api/image',{method:'POST',body:fd});const j=await r.json();log(r.ok?('afbeelding verstuurd, '+j.frames+' frame(s)'):('fout: '+j.detail))}catch(e){log('fout: '+e.message)}};
+
+// bediening
+$('#onBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":true}'}).then(st).catch(err);
+$('#offBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":false}'}).then(st).catch(err);
+$('#stopBtn').onclick=()=>api('/animation/stop',{method:'POST'}).then(st).catch(err);
+$('#bright').oninput=e=>$('#brightV').textContent=e.target.value;
+$('#bright').onchange=e=>api('/brightness',{method:'POST',body:JSON.stringify({brightness:+e.target.value})}).then(st).catch(err);
+$('#solidBtn').onclick=()=>api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})}).then(st).catch(err);
+$('#presetBtn').onclick=()=>api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})}).then(st).catch(err);
+$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,speed:+$('#speed').value,scroll:$('#scroll').checked,brightness:+$('#frameBright').value/100})}).then(r=>log('tekst: '+r.frames+' frames')).catch(err);
+
+// kalibratie
+const pixGo=async()=>{try{const r=await api('/test/pixel',{method:'POST',body:JSON.stringify({index:+$('#pix').value,color:$('#color').value})});$('#pixHint').textContent=r.expected_xy?('verwacht op x='+r.expected_xy[0]+', y='+r.expected_xy[1]):'';initGrid();if(r.expected_xy){grid[r.expected_xy[1]][r.expected_xy[0]]=$('#color').value;draw()}}catch(e){err(e)}};
+$('#pixGo').onclick=pixGo;$('#pixNext').onclick=()=>{$('#pix').value=+$('#pix').value+1;pixGo()};$('#pixPrev').onclick=()=>{$('#pix').value=Math.max(0,+$('#pix').value-1);pixGo()};
+$('#layoutSave').onclick=()=>api('/layout',{method:'PUT',body:JSON.stringify({width:+$('#lw').value,height:+$('#lh').value,order:$('#lorder').value,serpentine:$('#lserp').checked,flip_x:$('#lfx').checked,flip_y:$('#lfy').checked})}).then(l=>{applyLayout(l);log('layout opgeslagen')}).catch(err);
+$('#encoder').onchange=e=>api('/encoder?name='+e.target.value,{method:'POST'}).then(r=>log('encoder: '+r.pixel_encoder)).catch(err);
+$('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>log('raw verstuurd: '+r.sent)).catch(err);
+
+function applyLayout(l){W=l.width;H=l.height;$('#lw').value=W;$('#lh').value=H;$('#lorder').value=l.order;$('#lserp').checked=l.serpentine;$('#lfx').checked=l.flip_x;$('#lfy').checked=l.flip_y;initGrid();}
+function st(s){const c=$('#conn');c.className=s.connected?'on':'';c.innerHTML='verbinding: <b>'+(s.connected?'verbonden':'niet verbonden')+'</b>'+(s.transport&&s.transport.address?' · '+s.transport.address:'')+(s.power!=null?' · '+(s.power?'aan':'uit'):'')+(s.animation?' · ▶ '+s.animation:'')+(s.last_error?' · ⚠ '+s.last_error:'');if(s.brightness){$('#bright').value=s.brightness;$('#brightV').textContent=s.brightness}}
+function err(e){log('fout: '+(e.message||e))}
+(async()=>{try{const s=await api('/status');applyLayout(s.layout);$('#encoder').value=s.pixel_encoder;st(s);const p=await api('/presets');p.presets.forEach(x=>{const o=document.createElement('option');o.value=x.number;o.textContent=x.number+' · '+x.name;$('#preset').appendChild(o)})}catch(e){err(e);initGrid()}
+  setInterval(()=>api('/status').then(st).catch(()=>{}),5000)})();
+</script>
+</body>
+</html>

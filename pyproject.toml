@@ -1,0 +1,31 @@
+[project]
+name = "fairycurtain"
+version = "1.0.0"
+description = "Hello Fairy BLE LED-gordijn aansturen via REST API, webeditor en MQTT/Home Assistant"
+requires-python = ">=3.10"
+dependencies = [
+  "bleak>=0.21",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "python-multipart>=0.0.9",
+  "pillow>=10.1",
+  "pyyaml>=6",
+  "aiohttp>=3.9",
+  "aiomqtt>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "httpx"]
+
+[project.scripts]
+fairycurtain = "fairycurtain.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["fairycurtain*"]
+
+[tool.setuptools.package-data]
+fairycurtain = ["static/*"]

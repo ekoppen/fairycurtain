@@ -1,0 +1,42 @@
+# FairyCurtain – kopieer naar config.yaml en pas aan.
+
+device:
+  transport: bleak            # bleak = eigen Bluetooth-adapter | esp32 = via ESP32-bridge | fake = droog testen
+  address: null               # BLE MAC-adres (bv. "BE:29:FC:00:0B:09"); null = scannen op naam
+  name_prefix: "Hello Fairy-"
+  adapter: null               # bv. hci0 (alleen bleak op Linux)
+  bridge_url: "http://192.168.1.60"   # alleen bij transport: esp32
+  pixel_encoder: indexed_da   # indexed_da | plain_rgb  (zie README, "Pixelprotocol")
+  send_init: true             # init-reeks zoals de app die stuurt
+  packet_delay: 0.03          # seconden tussen pixel-pakketten
+  max_fps: 8
+
+layout:                       # pas aan na kalibratie in de webeditor
+  width: 20
+  height: 20
+  order: column               # column = slierten van boven naar beneden | row
+  serpentine: false
+  flip_x: false
+  flip_y: false
+
+render:
+  brightness: 0.5             # 0–1, standaard-dimming voor plaatjes/tekst
+  gamma: 1.0
+  font_path: null             # bv. /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+
+api:
+  host: 0.0.0.0
+  port: 8321
+  api_key: null               # zet een geheim en stuur header X-API-Key
+
+mqtt:
+  enabled: false
+  host: 192.168.1.10
+  port: 1883
+  username: null
+  password: null
+  base_topic: fairycurtain
+  discovery_prefix: homeassistant
+  device_name: "LED-gordijn"
+
+log_level: INFO
