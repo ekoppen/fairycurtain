@@ -104,6 +104,12 @@ class FairyCurtain:
         await self.transport.connect()
         self._initialised = False
         self.state["last_error"] = None
+        # Net als de app: direct na verbinden de init-reeks sturen (gordijn lijkt dit te verwachten).
+        if self.send_init:
+            try:
+                await self._ensure_init()
+            except Exception as e:
+                log.debug("init na verbinden: %s", e)
         self._emit()
 
     async def start(self) -> None:

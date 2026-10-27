@@ -112,6 +112,7 @@ static void hConnect() {
   if (isConnected() && (mac.length() == 0 || mac.equalsIgnoreCase(connectedMac))) { hStatus(); return; }
   if (isConnected()) client->disconnect();
   bool ok = connectCurtain(mac);
+  if (!ok) { delay(2000); ok = connectCurtain(mac); }   // gordijn adverteert pas weer even na een verbreking
   if (!ok) { sendJson("{\"connected\":false,\"error\":\"verbinden mislukt\"}", 503); return; }
   hStatus();
 }
