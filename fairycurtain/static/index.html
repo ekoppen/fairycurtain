@@ -40,9 +40,9 @@ a{color:inherit}
 .chip i{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 25%,transparent)}
 .chip.on i{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
 .spacer{flex:1}
-.iconbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center}
+.iconbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center}
 .tabs{display:flex;gap:4px;margin:10px 0 18px;border-bottom:1px solid var(--line)}
-.tabs button{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--mut);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;min-height:44px}
+.tabs button{background:none;border:0;padding:8px 12px;cursor:pointer;color:var(--mut);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;height:40px}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc)}
 .page{display:none}.page.active{display:block}
 
@@ -60,7 +60,7 @@ canvas#live{width:100%;aspect-ratio:1;display:block;image-rendering:auto}
 
 /* bronkeuze */
 .sources{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0 22px}
-.src{border:1px solid var(--line);background:var(--panel);border-radius:var(--rs);padding:12px 8px;min-height:64px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:500;font-size:14px;text-align:center;transition:border-color .15s,background .15s}
+.src{border:1px solid var(--line);background:var(--panel);border-radius:var(--rs);padding:8px 6px;min-height:54px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:500;font-size:14px;text-align:center;transition:border-color .15s,background .15s}
 .src small{font-weight:400;color:var(--mut);font-size:11px}
 .src.active{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--panel));box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 35%,transparent) inset}
 .src:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -73,14 +73,16 @@ canvas#live{width:100%;aspect-ratio:1;display:block;image-rendering:auto}
 .panel h2{font-size:15px;font-weight:600;margin:0 0 10px}
 .panel h2 small{font-weight:400;color:var(--mut);margin-left:6px;font-size:13px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
-.btn{min-height:44px;padding:0 16px;border-radius:var(--rs);border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.btn{height:38px;padding:0 14px;border-radius:var(--rs);border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-weight:500;font-size:14px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
 .btn.primary{background:var(--acc);color:var(--acc-fg);border-color:transparent;font-weight:600}
 .btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
-.btn.sm{min-height:36px;padding:0 12px;font-size:14px}
+#masterBtn{min-width:72px;justify-content:center}#masterBtn[aria-pressed="true"]{background:var(--ok);color:#06240f;border-color:transparent;font-weight:600}#masterBtn[aria-pressed="false"]{background:var(--panel2);color:var(--mut)}
+.hero.off{opacity:.55}
+.btn.sm{height:38px;padding:0 14px}
 .btn:disabled{opacity:.5;cursor:default}
-select,input[type=text],input[type=number],input[type=url],input[type=password],textarea{min-height:44px;padding:8px 12px;border-radius:var(--rs);border:1px solid var(--line);background:var(--panel2);max-width:100%}
-textarea{min-height:88px;width:100%;font-family:ui-monospace,Menlo,monospace;font-size:13px}
-input[type=color]{width:44px;height:44px;border:1px solid var(--line);border-radius:var(--rs);background:var(--panel2);padding:3px;cursor:pointer}
+select,input[type=text],input[type=number],input[type=url],input[type=password],textarea{height:38px;padding:0 12px;font-size:14px;border-radius:var(--rs);border:1px solid var(--line);background:var(--panel2);max-width:100%}
+textarea{height:auto;min-height:88px;padding:8px 12px;width:100%;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+input[type=color]{width:38px;height:38px;border:1px solid var(--line);border-radius:var(--rs);background:var(--panel2);padding:3px;cursor:pointer}
 input[type=range]{flex:1;min-width:120px;accent-color:var(--acc)}
 label.l{display:flex;align-items:center;gap:8px;font-size:14px}
 .muted{color:var(--mut);font-size:13px}
@@ -98,9 +100,9 @@ label.l{display:flex;align-items:center;gap:8px;font-size:14px}
 /* tekenen */
 canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:var(--rs);touch-action:none;cursor:crosshair;image-rendering:pixelated}
 .pal{display:flex;gap:6px;flex-wrap:wrap}
-.pal span{width:30px;height:30px;border-radius:7px;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
+.pal span{width:26px;height:26px;border-radius:6px;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--rs);overflow:hidden}
-.seg button{border:0;background:var(--panel2);padding:0 14px;min-height:40px;cursor:pointer}
+.seg button{border:0;background:var(--panel2);padding:0 14px;height:36px;font-size:14px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--acc);color:var(--acc-fg);font-weight:600}
 details{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}
 summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:center}
@@ -116,6 +118,7 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
     <h1>Fairy<span>Curtain</span></h1>
     <span class="chip" id="conn"><i></i><span>verbinden…</span></span>
     <span class="spacer"></span>
+    <button class="btn sm" id="masterBtn" aria-pressed="true" title="Hoofdschakelaar">Aan</button>
     <button class="iconbtn" id="themeBtn" title="Dag/nacht" aria-label="Dag/nacht-thema wisselen">◐</button>
   </header>
   <nav class="tabs" role="tablist">
@@ -163,7 +166,7 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
             <button class="btn sm" id="liveLoad">Haal van gordijn</button>
           </div>
           <div class="row">
-            <button class="btn primary" id="sendFrame" style="flex:1">Zet op het gordijn</button>
+            <button class="btn primary" id="sendFrame">Zet op het gordijn</button>
           </div>
           <div class="muted">Per lichtje kent het gordijn alleen een kleurtint, wit of uit; donkere kleuren worden uit, grijzige wit.</div>
         </div>
@@ -308,10 +311,14 @@ function st(s){const c=$('#conn');c.className='chip'+(s.connected?' on':'');c.qu
   $('#nowKind').textContent=s.power===false?'Het gordijn is uit':(s.animation?'Nu op het gordijn · animatie':'Nu op het gordijn');
   $('#nowLabel').textContent=src.label||KINDS[src.kind]||'';
   $('#nowSub').textContent=[s.transport&&s.transport.address?s.transport.address:'',s.last_error?'⚠ '+s.last_error:''].filter(Boolean).join('  ');
-  $$('.src').forEach(b=>b.classList.toggle('active',b.dataset.src===(s.power===false?'off':src.kind)));}
+  $$('.src').forEach(b=>b.classList.toggle('active',b.dataset.src===(s.power===false?'off':src.kind)));
+  const mb=$('#masterBtn');mb.setAttribute('aria-pressed',String(s.master!==false));mb.textContent=s.master===false?'Uit':'Aan';$('.hero').classList.toggle('off',s.master===false);
+  if(s.master===false)$('#nowKind').textContent='Hoofdschakelaar staat uit';}
+$('#masterBtn').onclick=()=>{const on=$('#masterBtn').getAttribute('aria-pressed')!=='true';api('/master',{method:'POST',body:JSON.stringify({on})}).then(s=>{st(s);toast(on?'Gordijn aan':'Gordijn uit; now playing gepauzeerd')}).catch(err)};
 $$('.src').forEach(b=>b.onclick=async()=>{const k=b.dataset.src;try{
-  if(k==='off'){await api('/power',{method:'POST',body:'{"on":false}'})}
-  else if(k==='nowplaying'){await api('/nowplaying/enable?enabled=true',{method:'POST'});toast('Now playing volgt de muziek')}
+  if(k==='off'){await api('/master',{method:'POST',body:'{"on":false}'});refresh();return}
+  if((await api('/status')).master===false)await api('/master',{method:'POST',body:'{"on":true}'});
+  if(k==='nowplaying'){await api('/nowplaying/enable?enabled=true',{method:'POST'});toast('Now playing volgt de muziek')}
   else if(k==='manual'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await sendFrame()}
   else if(k==='preset'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})})}
   else if(k==='color'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})})}
@@ -344,8 +351,8 @@ $('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$
 $('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(()=>toast('Beweging toegepast')).catch(err);
 $('#presetBtn').onclick=()=>api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})}).then(refresh).catch(err);
 $('#solidBtn').onclick=()=>api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})}).then(refresh).catch(err);
-$('#onBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":true}'}).then(refresh).catch(err);
-$('#offBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":false}'}).then(refresh).catch(err);
+$('#onBtn').onclick=()=>api('/master',{method:'POST',body:'{"on":true}'}).then(refresh).catch(err);
+$('#offBtn').onclick=()=>api('/master',{method:'POST',body:'{"on":false}'}).then(refresh).catch(err);
 $('#bright').oninput=e=>$('#brightV').textContent=e.target.value;
 $('#bright').onchange=e=>api('/brightness',{method:'POST',body:JSON.stringify({brightness:+e.target.value})}).then(refresh).catch(err);
 

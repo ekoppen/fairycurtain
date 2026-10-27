@@ -183,6 +183,10 @@ class NowPlaying:
         playing = info.get("playing")
         playing = playing in (True, "playing", "play", 1, "1", "true", "True") if playing is not None else True
         key = f"{info.get('artist')}|{info.get('title')}|{info.get('image')}|{playing}"
+        if not self.c.master_on:
+            self._key = None       # zodat het na 'Aan' meteen opnieuw getoond wordt
+            self.current = {**info, "playing": playing}
+            return
         if key == self._key:
             return
         self._key = key

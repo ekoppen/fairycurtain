@@ -143,7 +143,14 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
     # ---- basisbediening
     @app.post("/api/power", dependencies=dep)
     async def power(body: PowerIn):
+        """Gordijn aan/uit zonder de hoofdschakelaar te veranderen (bijv. vanuit HA)."""
         await curtain.set_power(body.on)
+        return curtain.status()
+
+    @app.post("/api/master", dependencies=dep)
+    async def master(body: PowerIn):
+        """Hoofdschakelaar: uit = alles uit en now playing gepauzeerd; aan = hervatten."""
+        await curtain.set_master(body.on)
         return curtain.status()
 
     @app.post("/api/color", dependencies=dep)

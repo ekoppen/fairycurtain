@@ -43,6 +43,7 @@ class FairyCurtain:
             "rgb": [255, 255, 255], "brightness": 100,
             "preset": None, "animation": None, "last_error": None,
             "source": {"kind": "unknown", "label": "Onbekend", "since": None},
+            "master": True,   # hoofdschakelaar: False = alles blijft uit, ook now playing
             "last_notification": None, "info": None,
             "movement": {"direction": 0, "brightness": 100, "speed": 100},
         }
@@ -211,6 +212,20 @@ class FairyCurtain:
         if not on:
             self.set_source("off", "Uit")
         self._emit()
+
+    async def set_master(self, on: bool) -> None:
+        """Hoofdschakelaar. Uit = gordijn uit en automatische bronnen (now playing) gepauzeerd."""
+        self.state["master"] = bool(on)
+        if not on:
+            await self.set_power(False)
+        else:
+            await self.set_power(True)
+            self.set_source("unknown", "Aan, wacht op inhoud")
+        self._emit()
+
+    @property
+    def master_on(self) -> bool:
+        return bool(self.state.get("master", True))
 
     async def set_rgb(self, r: int, g: int, b: int, brightness: Optional[int] = None) -> None:
         await self.stop_animation()

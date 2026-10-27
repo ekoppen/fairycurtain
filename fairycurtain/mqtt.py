@@ -133,8 +133,10 @@ class MqttBridge:
         if topic.endswith("/light/set"):
             d = json.loads(text or "{}")
             if d.get("state") == "OFF":
-                await c.set_power(False)
+                await c.set_master(False)
                 return
+            if not c.master_on:
+                await c.set_master(True)
             bri = d.get("brightness")
             bri_pct = int(round(bri * 100 / 255)) if bri is not None else None
             if d.get("effect"):
