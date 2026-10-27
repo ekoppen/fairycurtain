@@ -112,7 +112,12 @@ static void hConnect() {
 static void hDisconnect() { if (client) client->disconnect(); writeChar = nullptr; connectedMac = ""; hStatus(); }
 static void hWrite() {
   if (!isConnected()) { sendJson("{\"error\":\"niet verbonden\"}", 503); return; }
-  String hex = server.arg("plain"); hex.trim();
+  // body kan als text/plain komen (arg "plain") of als formulier (curl -d zonder Content-Type):
+  // dan staat de hex als argumentnaam. Ook ?hex=... op de URL werkt.
+  String hex = server.arg("plain");
+  if (hex.length() == 0) hex = server.arg("hex");
+  if (hex.length() == 0 && server.args() > 0) hex = server.argName(0);
+  hex.trim();
   size_t n = hex.length() / 2; uint8_t buf[256];
   if (n == 0 || n > sizeof(buf)) { sendJson("{\"error\":\"lengte\"}", 400); return; }
   for (size_t i = 0; i < n; i++) buf[i] = (uint8_t)strtoul(hex.substring(i * 2, i * 2 + 2).c_str(), nullptr, 16);
