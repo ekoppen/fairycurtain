@@ -80,7 +80,9 @@ static bool connectCurtain(String mac) {
   if (mac.length() == 0) return false;
   if (!client) { client = NimBLEDevice::createClient(); client->setClientCallbacks(new ClientCb(), true); }
   client->setConnectTimeout(10000);
-  if (!client->connect(NimBLEAddress(mac.c_str(), BLE_ADDR_PUBLIC))) return false;
+  // Hello Fairy gebruikt een random BLE-adres (begint vaak met 0xBE/0xCx): eerst random, dan public.
+  if (!client->connect(NimBLEAddress(mac.c_str(), BLE_ADDR_RANDOM)) &&
+      !client->connect(NimBLEAddress(mac.c_str(), BLE_ADDR_PUBLIC))) return false;
   NimBLERemoteService* svc = client->getService(SVC_UUID);
   if (!svc) { client->disconnect(); return false; }
   writeChar = svc->getCharacteristic(WRITE_UUID);
