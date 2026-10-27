@@ -2,224 +2,395 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f16">
 <title>FairyCurtain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--fg:#e8e9ec;--mut:#8b919e;--acc:#f2c94c;--ok:#5bd38a;--bad:#ef6b6b}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line)}
-  header h1{font-size:17px;margin:0;letter-spacing:.3px}
-  #conn{font-size:12px;color:var(--mut)}
-  #conn b{color:var(--bad)} #conn.on b{color:var(--ok)}
-  main{display:grid;grid-template-columns:minmax(300px,520px) 1fr;gap:16px;padding:16px;max-width:1200px}
-  @media(max-width:800px){main{grid-template-columns:1fr}}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
-  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);margin:0 0 10px}
-  canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:6px;touch-action:none;cursor:crosshair;image-rendering:pixelated}
-  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
-  button,select,input[type=text],input[type=number]{background:#22262f;color:var(--fg);border:1px solid var(--line);border-radius:7px;padding:7px 11px;font:inherit}
-  button{cursor:pointer} button:hover{border-color:#3d4452} button.primary{background:var(--acc);color:#111;border-color:var(--acc);font-weight:600}
-  button.danger{border-color:var(--bad);color:var(--bad)}
-  input[type=color]{width:42px;height:34px;border:none;background:none;padding:0;cursor:pointer}
-  input[type=range]{width:160px}
-  .pal{display:flex;gap:5px;flex-wrap:wrap}
-  .pal span{width:22px;height:22px;border-radius:5px;cursor:pointer;border:1px solid #0006}
-  .muted{color:var(--mut);font-size:12px}
-  #log{font:12px ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:120px;overflow:auto;margin-top:8px}
-  label{display:inline-flex;align-items:center;gap:6px}
-  .stack{display:flex;flex-direction:column;gap:14px}
+:root{
+  --bg:#eef0f4;--panel:#ffffff;--panel2:#f5f6f9;--line:#d9dde6;--fg:#171a22;--mut:#646b7a;
+  --acc:#d99a1e;--acc-fg:#1b1405;--ok:#1f9d5a;--bad:#d64c43;--warn:#c77d0a;
+  --curtain-bg:#0b0c12;--shadow:0 1px 2px rgba(20,24,40,.06),0 8px 24px rgba(20,24,40,.06);
+  --r:14px;--rs:9px;
+}
+:root[data-theme="dark"],:root:not([data-theme="light"]):has(body.sys-dark){
+  --bg:#0d0f16;--panel:#151826;--panel2:#1b1f30;--line:#262b3d;--fg:#eceef4;--mut:#8a90a3;
+  --acc:#f2b544;--acc-fg:#1b1405;--ok:#4fd18b;--bad:#ef6b63;--warn:#f0a830;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 30px rgba(0,0,0,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d0f16;--panel:#151826;--panel2:#1b1f30;--line:#262b3d;--fg:#eceef4;--mut:#8a90a3;
+    --acc:#f2b544;--acc-fg:#1b1405;--ok:#4fd18b;--bad:#ef6b63;--warn:#f0a830;
+    --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 30px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 Sora,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px calc(24px + env(safe-area-inset-bottom))}
+
+/* top */
+.top{display:flex;align-items:center;gap:12px;padding:14px 0 6px}
+.top h1{font-size:18px;font-weight:600;margin:0;letter-spacing:-.01em}
+.top h1 span{color:var(--acc)}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--mut);padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 25%,transparent)}
+.chip.on i{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+.spacer{flex:1}
+.iconbtn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center}
+.tabs{display:flex;gap:4px;margin:10px 0 18px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--mut);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;min-height:44px}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc)}
+.page{display:none}.page.active{display:block}
+
+/* hero: het gordijn */
+.hero{background:var(--curtain-bg);border-radius:var(--r);padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-40%;background:radial-gradient(60% 50% at 50% 40%,rgba(242,181,68,.10),transparent 70%);pointer-events:none}
+.hero-grid{display:grid;grid-template-columns:1fr minmax(0,360px) 1fr;align-items:center}
+.hero-grid>*{grid-column:2}
+canvas#live{width:100%;aspect-ratio:1;display:block;image-rendering:auto}
+.now{position:relative;margin:14px 0 0;color:#eceef4;text-align:center}
+.now .kind{font-size:12px;color:#8a90a3;font-weight:500}
+.now .label{font-size:17px;font-weight:600;line-height:1.3;margin-top:2px;word-break:break-word}
+.now .sub{font-size:12px;color:#8a90a3;margin-top:4px}
+.now img{width:36px;height:36px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;display:none}
+
+/* bronkeuze */
+.sources{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0 22px}
+.src{border:1px solid var(--line);background:var(--panel);border-radius:var(--rs);padding:12px 8px;min-height:64px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:500;font-size:14px;text-align:center;transition:border-color .15s,background .15s}
+.src small{font-weight:400;color:var(--mut);font-size:11px}
+.src.active{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--panel));box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 35%,transparent) inset}
+.src:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* panelen */
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}.sources{grid-template-columns:repeat(3,1fr)}.sources .src:nth-child(4),.sources .src:nth-child(5){grid-column:span 1}}
+@media (max-width:420px){.sources{grid-template-columns:repeat(2,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.panel h2{font-size:15px;font-weight:600;margin:0 0 10px}
+.panel h2 small{font-weight:400;color:var(--mut);margin-left:6px;font-size:13px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.btn{min-height:44px;padding:0 16px;border-radius:var(--rs);border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--acc);color:var(--acc-fg);border-color:transparent;font-weight:600}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px}
+.btn:disabled{opacity:.5;cursor:default}
+select,input[type=text],input[type=number],input[type=url],input[type=password],textarea{min-height:44px;padding:8px 12px;border-radius:var(--rs);border:1px solid var(--line);background:var(--panel2);max-width:100%}
+textarea{min-height:88px;width:100%;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+input[type=color]{width:44px;height:44px;border:1px solid var(--line);border-radius:var(--rs);background:var(--panel2);padding:3px;cursor:pointer}
+input[type=range]{flex:1;min-width:120px;accent-color:var(--acc)}
+label.l{display:flex;align-items:center;gap:8px;font-size:14px}
+.muted{color:var(--mut);font-size:13px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px}@media(max-width:760px){.fields{grid-template-columns:1fr}}
+.field{margin:8px 0}.field.wide{grid-column:1/-1}
+.field label{display:block;font-size:13px;font-weight:500;margin-bottom:4px}
+.field .help{font-size:12px;color:var(--mut);margin-top:3px}
+.field .err{font-size:12px;color:var(--bad);margin-top:3px;display:none}
+.field.invalid input,.field.invalid select,.field.invalid textarea{border-color:var(--bad)}
+.field.invalid .err{display:block}
+.field input:not([type=color]),.field select{width:100%}
+.restart{display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--rs);background:color-mix(in srgb,var(--warn) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--warn) 50%,var(--line));margin:12px 0}
+.restart.show{display:flex}
+
+/* tekenen */
+canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:var(--rs);touch-action:none;cursor:crosshair;image-rendering:pixelated}
+.pal{display:flex;gap:6px;flex-wrap:wrap}
+.pal span{width:30px;height:30px;border-radius:7px;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--rs);overflow:hidden}
+.seg button{border:0;background:var(--panel2);padding:0 14px;min-height:40px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--acc);color:var(--acc-fg);font-weight:600}
+details{border-top:1px solid var(--line);margin-top:12px;padding-top:8px}
+summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:center}
+#log{font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:140px;overflow:auto;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:92vw}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<header>
-  <h1>✨ FairyCurtain</h1>
-  <span id="conn">verbinding: <b>…</b></span>
-  <span style="flex:1"></span>
-  <a class="muted" href="/docs" target="_blank">API-docs</a>
-</header>
-<main>
-  <div class="stack">
-    <section class="panel">
-      <h2>Tekenen</h2>
-      <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;align-items:start">
-        <canvas id="grid"></canvas>
-        <div>
-          <div class="muted" style="margin-bottom:4px">Nu op het gordijn</div>
-          <canvas id="live" width="20" height="20" style="width:120px;height:120px;background:#000;border-radius:6px;image-rendering:pixelated"></canvas>
-          <div class="muted" id="liveInfo" style="margin-top:4px;min-height:1.2em"></div>
-          <button id="liveLoad" style="margin-top:6px;width:100%">Laad in editor</button>
+<div class="wrap">
+  <header class="top">
+    <h1>Fairy<span>Curtain</span></h1>
+    <span class="chip" id="conn"><i></i><span>verbinden…</span></span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="themeBtn" title="Dag/nacht" aria-label="Dag/nacht-thema wisselen">◐</button>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-page="control">Bediening</button>
+    <button role="tab" aria-selected="false" data-page="config">Instellingen</button>
+    <button role="tab" aria-selected="false" data-page="tools">Hulpmiddelen</button>
+  </nav>
+
+  <!-- ===================== BEDIENING ===================== -->
+  <section class="page active" id="page-control">
+    <div class="hero">
+      <div class="hero-grid"><canvas id="live" width="20" height="20"></canvas></div>
+      <div class="now">
+        <div class="kind" id="nowKind">Nu op het gordijn</div>
+        <div class="label"><img id="nowImg" alt=""><span id="nowLabel">…</span></div>
+        <div class="sub" id="nowSub"></div>
+      </div>
+    </div>
+
+    <div class="sources" role="group" aria-label="Wat toont het gordijn">
+      <button class="src" data-src="manual" id="srcManual">Eigen plaatje<small>laatste tekening</small></button>
+      <button class="src" data-src="nowplaying">Now playing<small id="npSrcSub">muziek volgen</small></button>
+      <button class="src" data-src="preset">Preset<small>ingebouwd effect</small></button>
+      <button class="src" data-src="color">Kleur<small>effen</small></button>
+      <button class="src" data-src="off">Uit<small>gordijn uit</small></button>
+    </div>
+
+    <div class="cols">
+      <div>
+        <div class="panel">
+          <h2>Tekenen <small>klik of sleep</small></h2>
+          <canvas id="grid"></canvas>
+          <div class="row" style="margin-top:12px">
+            <input type="color" id="color" value="#ff8800" aria-label="Tekenkleur">
+            <div class="pal" id="pal"></div>
+          </div>
+          <div class="row">
+            <div class="seg" role="group" aria-label="Gereedschap">
+              <button data-tool="pen" aria-pressed="true">Pen</button>
+              <button data-tool="erase" aria-pressed="false">Gum</button>
+              <button data-tool="fill" aria-pressed="false">Vullen</button>
+            </div>
+            <button class="btn sm" id="clearBtn">Leeg</button>
+            <button class="btn sm" id="mirrorBtn">Spiegel</button>
+            <button class="btn sm" id="liveLoad">Haal van gordijn</button>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="sendFrame" style="flex:1">Zet op het gordijn</button>
+          </div>
+          <div class="muted">Per lichtje kent het gordijn alleen een kleurtint, wit of uit; donkere kleuren worden uit, grijzige wit.</div>
+        </div>
+
+        <div class="panel" style="margin-top:16px">
+          <h2>Afbeelding of GIF</h2>
+          <div class="row">
+            <input type="file" id="imgFile" accept="image/*" style="flex:1;min-width:0">
+          </div>
+          <div class="row">
+            <select id="fit" aria-label="Passend maken"><option value="cover">vullen (bijsnijden)</option><option value="contain">passend</option><option value="stretch">uitrekken</option></select>
+            <button class="btn sm" id="imgPreview">In editor laden</button>
+            <button class="btn primary" id="imgSend">Zet op het gordijn</button>
+          </div>
+          <div class="muted">Een geanimeerde GIF wordt een diashow (één frame per ~3 s).</div>
         </div>
       </div>
-      <div class="row">
-        <input type="color" id="color" value="#ff8800">
-        <div class="pal" id="pal"></div>
-      </div>
-      <div class="row">
-        <label><input type="radio" name="tool" value="pen" checked> pen</label>
-        <label><input type="radio" name="tool" value="erase"> gum</label>
-        <label><input type="radio" name="tool" value="fill"> vullen</label>
-        <button id="clearBtn">Leeg</button>
-        <button id="mirrorBtn">Spiegel ↔</button>
-        <span style="flex:1"></span>
-        <button class="primary" id="sendFrame">Stuur naar gordijn</button>
-      </div>
-      <div class="muted">Klik/sleep om te tekenen. Het gordijn kent per pixel alleen een <b>tint</b> (plus wit en uit): donker wordt uit, grijzig wordt wit. Helderheid stel je in bij "Beweging". <input type="hidden" id="frameBright" value="100"><span id="frameBrightV" style="display:none"></span></div>
-    </section>
 
-    <section class="panel">
-      <h2>Afbeelding of GIF</h2>
-      <div class="row">
-        <input type="file" id="imgFile" accept="image/*">
-        <select id="fit"><option value="cover">vullen (bijsnijden)</option><option value="contain">passend</option><option value="stretch">uitrekken</option></select>
-        <button id="imgPreview">Voorvertoning</button>
-        <button class="primary" id="imgSend">Versturen</button>
-      </div>
-      <div class="muted">Een geanimeerde GIF wordt als animatie afgespeeld. Een statische afbeelding kun je eerst in het raster laden en bijwerken.</div>
-    </section>
-  </div>
+      <div>
+        <div class="panel">
+          <h2>Tekst</h2>
+          <div class="row">
+            <input type="text" id="text" placeholder="Bijv. HOI" style="flex:1;min-width:140px" aria-label="Tekst">
+            <input type="color" id="textColor" value="#ffffff" aria-label="Tekstkleur">
+          </div>
+          <div class="row">
+            <label class="l">sec/pagina <input type="number" id="pageSec" value="4" min="1" max="60" style="width:76px"></label>
+            <button class="btn primary" id="textBtn">Toon tekst</button>
+          </div>
+          <div class="muted">Tekst gaat in pagina's van ~3 tekens. Combineer met beweging "lus links" voor een lopende tekst.</div>
+        </div>
 
-  <div class="stack">
-    <section class="panel">
-      <h2>Bediening</h2>
-      <div class="row">
-        <button id="onBtn">Aan</button><button id="offBtn">Uit</button>
-        <button id="stopBtn">Stop animatie</button>
-        <label>helderheid <input type="range" id="bright" min="1" max="100" value="100"><span id="brightV">100</span></label>
-      </div>
-      <div class="row">
-        <input type="color" id="solid" value="#4080ff"><button id="solidBtn">Effen kleur</button>
-        <select id="preset"></select><button id="presetBtn">Preset</button>
-      </div>
-    </section>
+        <div class="panel" style="margin-top:16px">
+          <h2>Beweging <small>door het gordijn zelf</small></h2>
+          <div class="row">
+            <select id="dir" aria-label="Beweging" style="flex:1">
+              <option value="still">stil</option><option value="loop_left">lus links</option><option value="loop_right">lus rechts</option>
+              <option value="loop_up">lus omhoog</option><option value="loop_down">lus omlaag</option>
+              <option value="blink">knipperen</option><option value="breathe">ademen</option>
+              <option value="left">links (1x)</option><option value="right">rechts (1x)</option><option value="up">omhoog (1x)</option><option value="down">omlaag (1x)</option>
+            </select>
+            <button class="btn primary" id="mvBtn">Toepassen</button>
+          </div>
+          <div class="row"><label class="l" style="flex:1">snelheid <input type="range" id="mvSpeed" min="0" max="100" value="50"></label></div>
+          <div class="row"><label class="l" style="flex:1">helderheid <input type="range" id="mvBright" min="1" max="100" value="100"></label></div>
+        </div>
 
-    <section class="panel">
-      <h2>Now playing</h2>
-      <div class="row">
-        <label><input type="checkbox" id="npEnabled"> volgen (bron: <span id="npSource">–</span>)</label>
-        <span style="flex:1"></span>
-        <button id="npRefresh">Vernieuw</button>
+        <div class="panel" style="margin-top:16px">
+          <h2>Preset &amp; kleur</h2>
+          <div class="row">
+            <select id="preset" aria-label="Preset" style="flex:1"></select>
+            <button class="btn" id="presetBtn">Preset</button>
+          </div>
+          <div class="row">
+            <input type="color" id="solid" value="#4080ff" aria-label="Effen kleur">
+            <button class="btn" id="solidBtn">Effen kleur</button>
+            <span class="spacer"></span>
+            <button class="btn" id="onBtn">Aan</button>
+            <button class="btn danger" id="offBtn">Uit</button>
+          </div>
+          <div class="row"><label class="l" style="flex:1">helderheid <input type="range" id="bright" min="1" max="100" value="100"><span id="brightV" style="width:3ch;text-align:right">100</span></label></div>
+        </div>
       </div>
-      <div class="row" id="npNow" style="align-items:center;gap:12px">
-        <img id="npCover" alt="" style="width:56px;height:56px;border-radius:6px;background:#000;object-fit:cover;display:none">
-        <div><div id="npTitle" class="muted">niets bekend</div><div id="npArtist" class="muted"></div></div>
-      </div>
-      <div class="muted">Zodra het nummer wisselt gaan artiest/titel en daarna de hoes naar het gordijn. Instellen in config.yaml → nowplaying.</div>
-    </section>
+    </div>
+  </section>
 
-    <section class="panel">
-      <h2>Tekst</h2>
-      <div class="row">
-        <input type="text" id="text" placeholder="Hallo!" style="flex:1;min-width:160px">
-        <input type="color" id="textColor" value="#ffffff">
-        <label>sec/pagina <input type="number" id="pageSec" value="4" min="1" max="60" style="width:64px"></label>
-        <button class="primary" id="textBtn">Toon</button>
-      </div>
-      <div class="muted">Tekst gaat in pagina's van ~3 tekens; een upload kost ~2,5 s, dus echt scrollen is te traag. Tip: korte tekst + beweging "lus links" hieronder.</div>
-    </section>
+  <!-- ===================== INSTELLINGEN ===================== -->
+  <section class="page" id="page-config">
+    <div class="restart" id="restartBox">
+      <span>Sommige wijzigingen werken pas na een herstart van de service.</span>
+      <span class="spacer"></span>
+      <button class="btn sm" id="restartBtn">Herstart service</button>
+    </div>
+    <p class="muted" style="margin:0 0 4px">Wijzigingen worden gecontroleerd terwijl je typt. Velden met ⟳ werken pas na een herstart van de service; de rest wordt direct toegepast.</p>
+    <div id="cfgForm"></div>
+    <div class="row" style="margin-top:16px;position:sticky;bottom:0;background:var(--bg);padding:12px 0">
+      <span class="muted" id="cfgPath"></span>
+      <span class="spacer"></span>
+      <button class="btn" id="cfgReload">Opnieuw laden</button>
+      <button class="btn primary" id="cfgSave">Opslaan</button>
+    </div>
+  </section>
 
-    <section class="panel">
-      <h2>Beweging (door het gordijn zelf)</h2>
+  <!-- ===================== HULPMIDDELEN ===================== -->
+  <section class="page" id="page-tools">
+    <div class="panel">
+      <h2>Kalibratie <small>welk lichtje is welke index?</small></h2>
+      <div class="muted">Licht één lichtje op en kijk waar het zit (±3 s). Standaard (kolommen, boven→beneden) klopt voor dit gordijn; pas alleen aan als het niet klopt, via Instellingen → Raster-layout.</div>
       <div class="row">
-        <select id="dir">
-          <option value="still">stil</option><option value="loop_left">lus links</option><option value="loop_right">lus rechts</option>
-          <option value="loop_up">lus omhoog</option><option value="loop_down">lus omlaag</option>
-          <option value="left">links (1x)</option><option value="right">rechts (1x)</option><option value="up">omhoog (1x)</option><option value="down">omlaag (1x)</option>
-          <option value="blink">knipperen</option><option value="breathe">ademen</option>
-        </select>
-        <label>snelheid <input type="range" id="mvSpeed" min="0" max="100" value="50"></label>
-        <label>helderheid <input type="range" id="mvBright" min="1" max="100" value="100"></label>
-        <button id="mvBtn">Toepassen</button>
-      </div>
-      <div class="muted">Werkt op het laatst geüploade plaatje; geen nieuwe upload nodig.</div>
-    </section>
-
-    <section class="panel">
-      <h2>Kalibratie (layout)</h2>
-      <div class="muted">Licht één fysieke LED op en kijk waar die zit (±3 s). De standaard (kolommen, boven→beneden) is bevestigd voor dit gordijn; alleen aanpassen als het niet klopt.</div>
-      <div class="row">
-        <label>index <input type="number" id="pix" value="0" min="0" style="width:80px"></label>
-        <button id="pixPrev">◀</button><button id="pixNext">▶</button><button id="pixGo">Licht op</button>
+        <label class="l">index <input type="number" id="pix" value="0" min="0" style="width:90px"></label>
+        <button class="btn sm" id="pixPrev">◀</button><button class="btn sm" id="pixNext">▶</button>
+        <button class="btn primary" id="pixGo">Licht op</button>
         <span class="muted" id="pixHint"></span>
       </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>Ruwe bytes <small>voor protocol-experimenten</small></h2>
       <div class="row">
-        <label>breedte <input type="number" id="lw" value="20" style="width:64px"></label>
-        <label>hoogte <input type="number" id="lh" value="20" style="width:64px"></label>
-        <select id="lorder"><option value="column">kolommen (slierten)</option><option value="row">rijen</option></select>
-        <label><input type="checkbox" id="lserp"> serpentine</label>
-        <label><input type="checkbox" id="lfx"> spiegel X</label>
-        <label><input type="checkbox" id="lfy"> spiegel Y</label>
-        <button id="layoutSave">Opslaan</button>
+        <input type="text" id="rawHex" placeholder="bv. aa020101ae" style="flex:1;font-family:ui-monospace,Menlo,monospace">
+        <button class="btn" id="rawBtn">Stuur</button>
       </div>
-      <div class="row">
-        <select id="encoder"><option value="diy">encoder: diy (bevestigd)</option><option value="legacy_indexed_da">encoder: legacy_indexed_da</option><option value="legacy_plain_rgb">encoder: legacy_plain_rgb</option></select>
-        <input type="text" id="rawHex" placeholder="raw hex, bv. aa020101ae" style="width:220px"><button id="rawBtn">Raw sturen</button>
-      </div>
+      <div class="row"><a class="muted" href="/docs" target="_blank">API-documentatie openen</a></div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h2>Logboek</h2>
       <div id="log"></div>
-    </section>
-  </div>
-</main>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
 
 <script>
-const $=s=>document.querySelector(s);
-const api=async(p,opt={})=>{const r=await fetch('/api'+p,{headers:{'Content-Type':'application/json'},...opt});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||r.status);return j;};
-const log=m=>{const el=$('#log');el.textContent=(new Date().toLocaleTimeString()+'  '+m+'\n'+el.textContent).slice(0,4000)};
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const api=async(p,opt={})=>{const r=await fetch('/api'+p,{headers:{'Content-Type':'application/json'},...opt});const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(typeof j.detail==='string'?j.detail:(j.detail&&j.detail.errors?'validatiefout':r.status)),{data:j});return j;};
+const log=m=>{const el=$('#log');el.textContent=(new Date().toLocaleTimeString()+'  '+m+'\n'+el.textContent).slice(0,6000)};
+let toastT;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200);log(m)};
+const err=e=>toast('Fout: '+(e.message||e));
 
-let W=20,H=20,grid=[],cv=$('#grid'),ctx=cv.getContext('2d');
-function initGrid(){grid=Array.from({length:H},()=>Array.from({length:W},()=>'#000000'));cv.width=W*20;cv.height=H*20;draw();}
-function draw(){const s=cv.width/W;for(let y=0;y<H;y++)for(let x=0;x<W;x++){ctx.fillStyle=grid[y][x];ctx.fillRect(x*s,y*s,s,s);}ctx.strokeStyle='#ffffff14';for(let i=0;i<=W;i++){ctx.beginPath();ctx.moveTo(i*s,0);ctx.lineTo(i*s,cv.height);ctx.stroke();}for(let i=0;i<=H;i++){ctx.beginPath();ctx.moveTo(0,i*s);ctx.lineTo(cv.width,i*s);ctx.stroke();}}
-function cell(e){const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);return (x>=0&&y>=0&&x<W&&y<H)?[x,y]:null;}
-function fill(x,y,from,to){if(from===to)return;const st=[[x,y]];while(st.length){const[a,b]=st.pop();if(a<0||b<0||a>=W||b>=H||grid[b][a]!==from)continue;grid[b][a]=to;st.push([a+1,b],[a-1,b],[a,b+1],[a,b-1]);}}
-let down=false;
-function paint(e){const c=cell(e);if(!c)return;const[x,y]=c;const tool=document.querySelector('input[name=tool]:checked').value;const col=$('#color').value;
-  if(tool==='fill'){fill(x,y,grid[y][x],col);}else grid[y][x]=tool==='erase'?'#000000':col;draw();}
-cv.addEventListener('pointerdown',e=>{down=true;paint(e)});cv.addEventListener('pointermove',e=>down&&paint(e));window.addEventListener('pointerup',()=>down=false);
-$('#clearBtn').onclick=()=>{initGrid()};
-$('#mirrorBtn').onclick=()=>{grid=grid.map(r=>[...r].reverse());draw()};
-['#ff0000','#ff8800','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff','#ff69b4','#8000ff','#000000'].forEach(c=>{const s=document.createElement('span');s.style.background=c;s.onclick=()=>$('#color').value=c;$('#pal').appendChild(s)});
-$('#frameBright').oninput=e=>$('#frameBrightV').textContent=e.target.value+'%';
-$('#sendFrame').onclick=async()=>{try{const hex=grid.flat();const r=await api('/frame',{method:'POST',body:JSON.stringify({hex,brightness:+$('#frameBright').value/100})});log('frame verstuurd ('+r.packets+' pakketten)');liveLoad()}catch(e){log('fout: '+e.message)}};
+/* thema */
+const root=document.documentElement;
+function applyTheme(t){if(t)root.setAttribute('data-theme',t);else root.removeAttribute('data-theme');try{t?localStorage.setItem('fc-theme',t):localStorage.removeItem('fc-theme')}catch(e){}}
+try{applyTheme(localStorage.getItem('fc-theme'))}catch(e){}
+$('#themeBtn').onclick=()=>{const cur=root.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');applyTheme(cur==='dark'?'light':'dark')};
 
-// afbeelding → raster (client-side preview)
-$('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return;const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const fit=$('#fit').value;let sx=0,sy=0,sw=img.width,sh=img.height,dx=0,dy=0,dw=W,dh=H;
-  if(fit==='cover'){const r=Math.max(W/sw,H/sh);const w=W/r,h=H/r;sx=(sw-w)/2;sy=(sh-h)/2;sw=w;sh=h;}else if(fit==='contain'){const r=Math.min(W/sw,H/sh);dw=sw*r;dh=sh*r;dx=(W-dw)/2;dy=(H-dh)/2;}
+/* tabs */
+$$('.tabs [role=tab]').forEach(b=>b.onclick=()=>{$$('.tabs [role=tab]').forEach(x=>x.setAttribute('aria-selected',x===b));$$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+b.dataset.page));if(b.dataset.page==='config')cfgLoad()});
+
+/* live hero: lichtjes */
+const live=$('#live'),lx=live.getContext('2d');let liveHex=null,LW=20,LH=20;
+function drawLive(hex,w,h){const S=24;if(live.width!==w*S){live.width=w*S;live.height=h*S}lx.clearRect(0,0,live.width,live.height);
+  for(let i=0;i<hex.length;i++){const c=hex[i];const x=(i%w)*S+S/2,y=Math.floor(i/w)*S+S/2;
+    if(c==='#000000'){lx.fillStyle='rgba(255,255,255,.06)';lx.beginPath();lx.arc(x,y,2.2,0,7);lx.fill();continue}
+    const g=lx.createRadialGradient(x,y,1,x,y,S*0.75);g.addColorStop(0,c);g.addColorStop(.35,c+'aa');g.addColorStop(1,c+'00');lx.fillStyle=g;lx.beginPath();lx.arc(x,y,S*0.75,0,7);lx.fill();
+    lx.fillStyle='#fff';lx.globalAlpha=.75;lx.beginPath();lx.arc(x,y,2.6,0,7);lx.fill();lx.globalAlpha=1;}}
+async function liveLoad(){try{const f=await api('/frame');liveHex=f.hex;LW=f.width;LH=f.height;drawLive(f.hex,f.width,f.height)}catch(e){}}
+
+/* status + bron */
+const KINDS={manual:'Eigen plaatje',nowplaying:'Now playing',preset:'Preset',color:'Effen kleur',off:'Uit',remote:'Afstandsbediening',unknown:'Onbekend'};
+function st(s){const c=$('#conn');c.className='chip'+(s.connected?' on':'');c.querySelector('span').textContent=s.connected?'verbonden':(s.last_error?'niet verbonden':'verbinden…');
+  if(s.brightness){$('#bright').value=s.brightness;$('#brightV').textContent=s.brightness}
+  const src=s.source||{kind:'unknown',label:'Onbekend'};
+  $('#nowKind').textContent=s.power===false?'Het gordijn is uit':(s.animation?'Nu op het gordijn · animatie':'Nu op het gordijn');
+  $('#nowLabel').textContent=src.label||KINDS[src.kind]||'';
+  $('#nowSub').textContent=[s.transport&&s.transport.address?s.transport.address:'',s.last_error?'⚠ '+s.last_error:''].filter(Boolean).join('  ');
+  $$('.src').forEach(b=>b.classList.toggle('active',b.dataset.src===(s.power===false?'off':src.kind)));}
+$$('.src').forEach(b=>b.onclick=async()=>{const k=b.dataset.src;try{
+  if(k==='off'){await api('/power',{method:'POST',body:'{"on":false}'})}
+  else if(k==='nowplaying'){await api('/nowplaying/enable?enabled=true',{method:'POST'});toast('Now playing volgt de muziek')}
+  else if(k==='manual'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await sendFrame()}
+  else if(k==='preset'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})})}
+  else if(k==='color'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})})}
+  refresh()}catch(e){err(e)}});
+
+/* tekenen */
+let W=20,H=20,grid=[],cv=$('#grid'),ctx=cv.getContext('2d'),tool='pen';
+function initGrid(){grid=Array.from({length:H},()=>Array.from({length:W},()=>'#000000'));cv.width=W*20;cv.height=H*20;draw()}
+function draw(){const s=cv.width/W;for(let y=0;y<H;y++)for(let x=0;x<W;x++){ctx.fillStyle=grid[y][x];ctx.fillRect(x*s,y*s,s,s)}ctx.strokeStyle='#ffffff14';for(let i=0;i<=W;i++){ctx.beginPath();ctx.moveTo(i*s,0);ctx.lineTo(i*s,cv.height);ctx.stroke()}for(let i=0;i<=H;i++){ctx.beginPath();ctx.moveTo(0,i*s);ctx.lineTo(cv.width,i*s);ctx.stroke()}}
+function cell(e){const r=cv.getBoundingClientRect();const x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);return(x>=0&&y>=0&&x<W&&y<H)?[x,y]:null}
+function fill(x,y,from,to){if(from===to)return;const st=[[x,y]];while(st.length){const[a,b]=st.pop();if(a<0||b<0||a>=W||b>=H||grid[b][a]!==from)continue;grid[b][a]=to;st.push([a+1,b],[a-1,b],[a,b+1],[a,b-1])}}
+let down=false;function paint(e){const c=cell(e);if(!c)return;const[x,y]=c,col=$('#color').value;if(tool==='fill')fill(x,y,grid[y][x],col);else grid[y][x]=tool==='erase'?'#000000':col;draw()}
+cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId);paint(e)});cv.addEventListener('pointermove',e=>down&&paint(e));cv.addEventListener('pointerup',()=>down=false);cv.addEventListener('pointercancel',()=>down=false);
+$$('.seg [data-tool]').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;$$('.seg [data-tool]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+$('#clearBtn').onclick=initGrid;$('#mirrorBtn').onclick=()=>{grid=grid.map(r=>[...r].reverse());draw()};
+['#ff0000','#ff8800','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff','#ff69b4','#8000ff','#000000'].forEach(c=>{const s=document.createElement('span');s.style.background=c;s.title=c;s.onclick=()=>$('#color').value=c;$('#pal').appendChild(s)});
+async function sendFrame(){const r=await api('/frame',{method:'POST',body:JSON.stringify({hex:grid.flat()})});toast('Plaatje staat op het gordijn');return r}
+$('#sendFrame').onclick=()=>sendFrame().then(refresh).catch(err);
+$('#liveLoad').onclick=()=>{if(!liveHex)return;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=liveHex[y*LW+x];if(v!==undefined)grid[y][x]=v}draw();toast('Frame van gordijn geladen')};
+
+/* afbeelding */
+$('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return toast('Kies eerst een bestand');const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const fit=$('#fit').value;let sx=0,sy=0,sw=img.width,sh=img.height,dx=0,dy=0,dw=W,dh=H;
+  if(fit==='cover'){const r=Math.max(W/sw,H/sh);const w=W/r,h=H/r;sx=(sw-w)/2;sy=(sh-h)/2;sw=w;sh=h}else if(fit==='contain'){const r=Math.min(W/sw,H/sh);dw=sw*r;dh=sh*r;dx=(W-dw)/2;dy=(H-dh)/2}
   x.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);const d=x.getImageData(0,0,W,H).data;for(let y=0;y<H;y++)for(let i=0;i<W;i++){const o=(y*W+i)*4;grid[y][i]='#'+[d[o],d[o+1],d[o+2]].map(v=>v.toString(16).padStart(2,'0')).join('')}draw();URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f)};
-$('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);fd.append('fit',$('#fit').value);fd.append('brightness',+$('#frameBright').value/100);
-  try{const r=await fetch('/api/image',{method:'POST',body:fd});const j=await r.json();log(r.ok?('afbeelding verstuurd, '+j.frames+' frame(s)'):('fout: '+j.detail))}catch(e){log('fout: '+e.message)}};
+$('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return toast('Kies eerst een bestand');const fd=new FormData();fd.append('file',f);fd.append('fit',$('#fit').value);
+  try{const r=await fetch('/api/image',{method:'POST',body:fd});const j=await r.json();if(!r.ok)throw new Error(j.detail);toast(j.animated?('GIF speelt, '+j.frames+' frames'):'Afbeelding staat op het gordijn');refresh()}catch(e){err(e)}};
 
-// bediening
-$('#onBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":true}'}).then(st).catch(err);
-$('#offBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":false}'}).then(st).catch(err);
-$('#stopBtn').onclick=()=>api('/animation/stop',{method:'POST'}).then(st).catch(err);
+/* tekst, beweging, preset, kleur */
+$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,page_seconds:+$('#pageSec').value})}).then(r=>{toast('Tekst: '+r.frames+" pagina's");refresh()}).catch(err);
+$('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(()=>toast('Beweging toegepast')).catch(err);
+$('#presetBtn').onclick=()=>api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})}).then(refresh).catch(err);
+$('#solidBtn').onclick=()=>api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})}).then(refresh).catch(err);
+$('#onBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":true}'}).then(refresh).catch(err);
+$('#offBtn').onclick=()=>api('/power',{method:'POST',body:'{"on":false}'}).then(refresh).catch(err);
 $('#bright').oninput=e=>$('#brightV').textContent=e.target.value;
-$('#bright').onchange=e=>api('/brightness',{method:'POST',body:JSON.stringify({brightness:+e.target.value})}).then(st).catch(err);
-$('#solidBtn').onclick=()=>api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})}).then(st).catch(err);
-$('#presetBtn').onclick=()=>api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})}).then(st).catch(err);
-$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,page_seconds:+$('#pageSec').value})}).then(r=>log('tekst: '+r.frames+" pagina's")).catch(err);
-$('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(r=>log('beweging: richting '+r.direction)).catch(err);
+$('#bright').onchange=e=>api('/brightness',{method:'POST',body:JSON.stringify({brightness:+e.target.value})}).then(refresh).catch(err);
 
-// kalibratie
-const pixGo=async()=>{try{const r=await api('/test/pixel',{method:'POST',body:JSON.stringify({index:+$('#pix').value,color:$('#color').value})});$('#pixHint').textContent=r.expected_xy?('verwacht op x='+r.expected_xy[0]+', y='+r.expected_xy[1]):'';initGrid();if(r.expected_xy){grid[r.expected_xy[1]][r.expected_xy[0]]=$('#color').value;draw()}}catch(e){err(e)}};
+/* hulpmiddelen */
+const pixGo=async()=>{try{const r=await api('/test/pixel',{method:'POST',body:JSON.stringify({index:+$('#pix').value,color:$('#color').value})});$('#pixHint').textContent=r.expected_xy?('verwacht: kolom '+(r.expected_xy[0]+1)+', rij '+(r.expected_xy[1]+1)):'';refresh()}catch(e){err(e)}};
 $('#pixGo').onclick=pixGo;$('#pixNext').onclick=()=>{$('#pix').value=+$('#pix').value+1;pixGo()};$('#pixPrev').onclick=()=>{$('#pix').value=Math.max(0,+$('#pix').value-1);pixGo()};
-$('#layoutSave').onclick=()=>api('/layout',{method:'PUT',body:JSON.stringify({width:+$('#lw').value,height:+$('#lh').value,order:$('#lorder').value,serpentine:$('#lserp').checked,flip_x:$('#lfx').checked,flip_y:$('#lfy').checked})}).then(l=>{applyLayout(l);log('layout opgeslagen')}).catch(err);
-$('#encoder').onchange=e=>api('/encoder?name='+e.target.value,{method:'POST'}).then(r=>log('encoder: '+r.pixel_encoder)).catch(err);
-$('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>log('raw verstuurd: '+r.sent)).catch(err);
+$('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>toast('Verstuurd: '+r.sent)).catch(err);
 
-let liveHex=null;
-async function liveLoad(){try{const f=await api('/frame');liveHex=f.hex;const c=$('#live');if(c.width!==f.width){c.width=f.width;c.height=f.height}
-  const x=c.getContext('2d');for(let i=0;i<f.hex.length;i++){x.fillStyle=f.hex[i];x.fillRect(i%f.width,Math.floor(i/f.width),1,1)}
-  $('#liveInfo').textContent=f.animation?('▶ '+f.animation):(f.mode==='pixels'?'plaatje':(f.mode||''))}catch(e){}}
-$('#liveLoad').onclick=()=>{if(!liveHex)return;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=liveHex[y*W+x];if(v!==undefined)grid[y][x]=v}draw();log('frame van gordijn geladen')};
-async function npLoad(){try{const s=await api('/nowplaying');$('#npEnabled').checked=!!s.enabled;$('#npSource').textContent=s.source||'–';const c=s.current||{};
-  $('#npTitle').textContent=c.title||'niets bekend';$('#npArtist').textContent=[c.artist,c.playing===false?'(gepauzeerd)':''].filter(Boolean).join(' ');
-  const img=$('#npCover');if(c.image){img.src=c.image;img.style.display='block'}else img.style.display='none'}catch(e){}}
-$('#npEnabled').onchange=e=>api('/nowplaying/enable?enabled='+e.target.checked,{method:'POST'}).then(s=>log('now playing '+(s.enabled?'aan':'uit'))).catch(err);
-$('#npRefresh').onclick=npLoad;
-function applyLayout(l){W=l.width;H=l.height;$('#lw').value=W;$('#lh').value=H;$('#lorder').value=l.order;$('#lserp').checked=l.serpentine;$('#lfx').checked=l.flip_x;$('#lfy').checked=l.flip_y;initGrid();}
-function st(s){const c=$('#conn');c.className=s.connected?'on':'';c.innerHTML='verbinding: <b>'+(s.connected?'verbonden':'niet verbonden')+'</b>'+(s.transport&&s.transport.address?' · '+s.transport.address:'')+(s.power!=null?' · '+(s.power?'aan':'uit'):'')+(s.animation?' · ▶ '+s.animation:'')+(s.last_error?' · ⚠ '+s.last_error:'');if(s.brightness){$('#bright').value=s.brightness;$('#brightV').textContent=s.brightness}}
-function err(e){log('fout: '+(e.message||e))}
-(async()=>{try{const s=await api('/status');applyLayout(s.layout);$('#encoder').value=s.pixel_encoder;st(s);const p=await api('/presets');p.presets.forEach(x=>{const o=document.createElement('option');o.value=x.number;o.textContent=x.number+' · '+x.name;$('#preset').appendChild(o)})}catch(e){err(e);initGrid()}
-  npLoad();liveLoad();setInterval(()=>{api('/status').then(st).catch(()=>{});npLoad();liveLoad()},3000)})();
+/* now playing */
+async function npLoad(){try{const s=await api('/nowplaying');const c=s.current||{};$('#npSrcSub').textContent=s.enabled?'volgt '+(s.source||''):'muziek volgen';
+  const img=$('#nowImg');if(c.image&&s.enabled){img.src=c.image;img.style.display='inline-block'}else img.style.display='none'}catch(e){}}
+
+/* instellingen */
+let schema=null,cfg=null;
+async function cfgLoad(){try{if(!schema)schema=await api('/config/schema');const r=await api('/config');cfg=r.config;$('#cfgPath').textContent=r.path||'';$('#restartBox').classList.toggle('show',!!r.restart_pending);buildForm()}catch(e){err(e)}}
+function buildForm(){const f=$('#cfgForm');f.innerHTML='';for(const [sec,ss] of Object.entries(schema)){const p=document.createElement('div');p.className='panel';p.style.marginTop='16px';
+  const h=document.createElement('h2');h.textContent=ss.label;p.appendChild(h);
+  const fl=document.createElement('div');fl.className='fields';p.appendChild(fl);
+  if(!ss.fields){fl.appendChild(fieldEl(sec,null,ss,cfg[sec]));f.appendChild(p);continue}
+  for(const [k,fs] of Object.entries(ss.fields)){const el=fieldEl(sec,k,fs,(cfg[sec]||{})[k]);if(fs.type==='dict'||fs.type==='url')el.classList.add('wide');fl.appendChild(el)}f.appendChild(p)}}
+function fieldEl(sec,key,fs,val){const id='f_'+sec+(key?'_'+key:'');const d=document.createElement('div');d.className='field';d.dataset.key=key?sec+'.'+key:sec;
+  const l=document.createElement('label');l.htmlFor=id;l.textContent=fs.label+(fs.restart?' ⟳':'');d.appendChild(l);let inp;
+  if(fs.type==='bool'){inp=document.createElement('select');[['true','ja'],['false','nee']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;inp.appendChild(o)});inp.value=String(!!val)}
+  else if(fs.type==='choice'){inp=document.createElement('select');fs.choices.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;inp.appendChild(o)});inp.value=val??fs.choices[0]}
+  else if(fs.type==='dict'){inp=document.createElement('textarea');inp.value=Object.entries(val||{}).map(([k,v])=>k+': '+(v??'')).join('\n');inp.placeholder='sleutel: waarde (één per regel)'}
+  else{inp=document.createElement('input');inp.type=fs.secret?'password':(fs.type==='int'||fs.type==='float'?'number':'text');if(fs.type==='float')inp.step='any';if('min'in fs)inp.min=fs.min;if('max'in fs)inp.max=fs.max;inp.value=val??'';if(fs.secret)inp.autocomplete='new-password'}
+  inp.id=id;inp.dataset.type=fs.type;d.appendChild(inp);
+  if(fs.help){const hp=document.createElement('div');hp.className='help';hp.textContent=fs.help;d.appendChild(hp)}
+  const e=document.createElement('div');e.className='err';d.appendChild(e);
+  inp.addEventListener('change',()=>validateLive());return d}
+function collect(){const out={};$$('#cfgForm .field').forEach(d=>{const [sec,key]=d.dataset.key.split('.');const inp=d.querySelector('input,select,textarea');let v=inp.value;const t=inp.dataset.type;
+  if(t==='bool')v=v==='true';else if(t==='int'||t==='float')v=v===''?null:+v;else if(t==='dict'){const o={};v.split('\n').forEach(line=>{const i=line.indexOf(':');if(i>0)o[line.slice(0,i).trim()]=line.slice(i+1).trim()});v=o}else if(v==='')v=null;
+  if(key){(out[sec]=out[sec]||{})[key]=v}else out[sec]=v});return out}
+function showErrors(errs){$$('#cfgForm .field').forEach(d=>{const m=errs[d.dataset.key];d.classList.toggle('invalid',!!m);d.querySelector('.err').textContent=m||''})}
+let vt;function validateLive(){clearTimeout(vt);vt=setTimeout(async()=>{try{const r=await api('/config/validate',{method:'POST',body:JSON.stringify(collect())});showErrors(r.errors||{})}catch(e){}},300)}
+$('#cfgReload').onclick=cfgLoad;
+$('#cfgSave').onclick=async()=>{try{const r=await api('/config',{method:'PUT',body:JSON.stringify(collect())});showErrors({});toast(r.restart_required?'Opgeslagen; herstart nodig voor sommige wijzigingen':'Opgeslagen en toegepast');$('#restartBox').classList.toggle('show',!!r.restart_required);applyLayoutFromCfg()}catch(e){if(e.data&&e.data.detail&&e.data.detail.errors){showErrors(e.data.detail.errors);toast('Controleer de rood gemarkeerde velden')}else err(e)}};
+$('#restartBtn').onclick=async()=>{try{await api('/restart',{method:'POST'});toast('Service herstart… even geduld');setTimeout(()=>location.reload(),6000)}catch(e){err(e)}};
+async function applyLayoutFromCfg(){try{const s=await api('/status');applyLayout(s.layout)}catch(e){}}
+
+/* init */
+function applyLayout(l){if(l.width!==W||l.height!==H){W=l.width;H=l.height;initGrid()}}
+async function refresh(){try{const s=await api('/status');st(s)}catch(e){}npLoad();liveLoad()}
+(async()=>{try{const s=await api('/status');applyLayout(s.layout);st(s);const p=await api('/presets');p.presets.forEach(x=>{const o=document.createElement('option');o.value=x.number;o.textContent=x.number+' · '+x.name;$('#preset').appendChild(o)})}catch(e){err(e);initGrid()}
+  if(!grid.length)initGrid();npLoad();liveLoad();setInterval(refresh,3000)})();
 </script>
 </body>
 </html>

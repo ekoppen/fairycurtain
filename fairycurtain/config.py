@@ -40,8 +40,8 @@ DEFAULTS = {
         "device_name": "LED-gordijn",
     },
     "nowplaying": {
-        "enabled": False, "source": "http", "url": None, "interval": 5,
-        "paths": {"title": "title", "artist": "artist", "image": "image"},
+        "enabled": False, "source": "http", "url": None, "headers": {}, "interval": 5,
+        "paths": {"title": "title", "artist": "artist", "image": "image", "playing": None},
         "show": "cover", "text_seconds": 6, "fit": "cover", "movement": "still",
         "idle": "keep", "brightness": 1.0,
         "ha_url": None, "ha_token": None, "entity_id": None, "topic": None,
@@ -87,3 +87,15 @@ def save_layout(cfg: dict, layout: dict) -> None:
     data = data or {}
     data["layout"] = layout
     p.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+
+
+def save_config(cfg: dict, data: dict) -> None:
+    """Schrijft de volledige (gevalideerde) config naar config.yaml; houdt onbekende sleutels."""
+    p = Path(cfg.get("_path", "config.yaml"))
+    existing = (yaml.safe_load(p.read_text()) if p.exists() else {}) or {}
+    for k, v in data.items():
+        if isinstance(v, dict) and isinstance(existing.get(k), dict):
+            existing[k] = {**existing[k], **v}
+        else:
+            existing[k] = v
+    p.write_text(yaml.safe_dump(existing, sort_keys=False, allow_unicode=True))

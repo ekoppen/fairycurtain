@@ -42,6 +42,7 @@ class FairyCurtain:
             "connected": False, "power": None, "mode": None,
             "rgb": [255, 255, 255], "brightness": 100,
             "preset": None, "animation": None, "last_error": None,
+            "source": {"kind": "unknown", "label": "Onbekend", "since": None},
             "last_notification": None, "info": None,
             "movement": {"direction": 0, "brightness": 100, "speed": 100},
         }
@@ -67,6 +68,10 @@ class FairyCurtain:
                 cb(self.status())
             except Exception as e:  # pragma: no cover
                 log.debug("listener: %s", e)
+
+    def set_source(self, kind: str, label: str) -> None:
+        """Wat bepaalt nu de weergave: manual | nowplaying | preset | color | off | remote."""
+        self.state["source"] = {"kind": kind, "label": label, "since": time.time()}
 
     def status(self) -> dict:
         d = dict(self.state)
@@ -102,6 +107,10 @@ class FairyCurtain:
         elif st.mode == 2:
             self.state.update(mode="preset", preset=st.preset,
                               brightness=round((st.preset_brightness or 0) / 10))
+        if st.power is False:
+            self.set_source("off", "Uit (afstandsbediening)")
+        elif st.mode in (1, 2) and self.state["source"]["kind"] not in ("manual", "nowplaying") :
+            self.set_source("remote", "Afstandsbediening")
         self._emit()
 
     # -------------------------------------------------------- verbinding --
@@ -199,6 +208,8 @@ class FairyCurtain:
         async with self._lock:
             await self._send(P.power(on), wait_ack=True)
         self.state["power"] = on
+        if not on:
+            self.set_source("off", "Uit")
         self._emit()
 
     async def set_rgb(self, r: int, g: int, b: int, brightness: Optional[int] = None) -> None:
@@ -210,6 +221,7 @@ class FairyCurtain:
                 await self._send(P.power(True), wait_ack=True)
             await self._send(P.color_rgb(r, g, b, brightness), wait_ack=True)
         self.state.update(power=True, mode="color", rgb=[r, g, b], brightness=brightness, preset=None)
+        self.set_source("color", "Effen kleur #%02x%02x%02x" % (r, g, b))
         self._emit()
 
     async def set_brightness(self, brightness: int) -> None:
@@ -229,6 +241,7 @@ class FairyCurtain:
                 await self._send(P.power(True), wait_ack=True)
             await self._send(P.preset(number, brightness), wait_ack=True)
         self.state.update(power=True, mode="preset", preset=int(number), brightness=brightness)
+        self.set_source("preset", f"Preset {number}: {P.PRESETS.get(int(number), '')}".strip(": "))
         self._emit()
 
     # ------------------------------------------------------------- frames --
@@ -282,10 +295,11 @@ class FairyCurtain:
                 await self._send(P.diy_mode(0x01, mv["direction"], mv["brightness"], mv["speed"]))
         self._emit()
 
-    async def show_grid(self, grid: Grid) -> None:
+    async def show_grid(self, grid: Grid, source: tuple[str, str] | None = None) -> None:
         await self.stop_animation()
         async with self._lock:
             await self._show_grid_locked(grid)
+        self.set_source(*(source or ("manual", "Eigen plaatje")))
         self._emit()
 
     async def show_solid(self, r: int, g: int, b: int) -> None:
@@ -305,13 +319,16 @@ class FairyCurtain:
 
     # ---------------------------------------------------------- animatie --
 
-    async def play(self, frames: List[Frame], loop: bool = True, name: str = "animation") -> None:
+    async def play(self, frames: List[Frame], loop: bool = True, name: str = "animation",
+                   source: tuple[str, str] | None = None) -> None:
         await self.stop_animation()
         if not frames:
             return
+        src = source or ("manual", name)
         if len(frames) == 1 and not loop:
-            await self.show_grid(frames[0][0])
+            await self.show_grid(frames[0][0], source=src)
             return
+        self.set_source(*src)
         self._anim_task = asyncio.create_task(self._anim_loop(frames, loop))
         self.state["animation"] = name
         self._emit()

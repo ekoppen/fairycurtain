@@ -6,6 +6,7 @@ Interactieve documentatie: http://host:8321/docs
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 from pathlib import Path
@@ -17,7 +18,8 @@ from pydantic import BaseModel, Field
 
 from . import protocol as P
 from . import render as R
-from .config import save_layout
+from .config import save_config, save_layout
+from .config_schema import SCHEMA, ConfigError, mask_secrets, merge_secrets, validate
 from .device import FairyCurtain
 from .layout import Layout
 
@@ -340,6 +342,70 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         await np.update({"title": body.get("title"), "artist": body.get("artist"),
                          "image": body.get("image"), "playing": body.get("playing", True)})
         return np.status()
+
+    # ---- config-editor
+    @app.get("/api/config/schema", dependencies=dep)
+    async def config_schema():
+        return SCHEMA
+
+    @app.get("/api/config", dependencies=dep)
+    async def config_get():
+        return {"config": mask_secrets({k: v for k, v in cfg.items() if not k.startswith("_")}),
+                "path": cfg.get("_path"), "restart_pending": bool(getattr(app.state, "restart_pending", False))}
+
+    @app.post("/api/config/validate", dependencies=dep)
+    async def config_validate(body: dict):
+        try:
+            validate(merge_secrets(body, cfg))
+        except ConfigError as e:
+            return {"ok": False, "errors": e.errors}
+        return {"ok": True, "errors": {}}
+
+    @app.put("/api/config", dependencies=dep)
+    async def config_put(body: dict):
+        merged = merge_secrets(body, cfg)
+        try:
+            clean = validate(merged)
+        except ConfigError as e:
+            raise HTTPException(422, {"errors": e.errors})
+        # wat live kan, live toepassen
+        needs_restart = False
+        for section, sspec in SCHEMA.items():
+            for fname, fspec in sspec.get("fields", {}).items():
+                old = (cfg.get(section) or {}).get(fname)
+                new = clean.get(section, {}).get(fname)
+                if old != new and fspec.get("restart"):
+                    needs_restart = True
+        if not needs_restart and clean.get("log_level") != cfg.get("log_level"):
+            needs_restart = True
+        try:
+            save_config(cfg, clean)
+        except Exception as e:
+            raise HTTPException(500, f"Opslaan mislukt: {e}")
+        # live bijwerken
+        cfg.update({k: v for k, v in clean.items()})
+        curtain.layout = Layout.from_dict(clean["layout"])
+        curtain.pixel_encoder = clean["device"]["pixel_encoder"]
+        curtain.send_init = clean["device"]["send_init"]
+        curtain.packet_delay = clean["device"]["packet_delay"]
+        curtain.min_frame_time = 1.0 / max(0.1, clean["device"]["max_fps"])
+        render_cfg.update(clean["render"])
+        np = getattr(app.state, "nowplaying", None)
+        if np:
+            np.cfg.update(clean["nowplaying"])
+            np.enabled = bool(clean["nowplaying"]["enabled"])
+        app.state.restart_pending = needs_restart
+        return {"ok": True, "restart_required": needs_restart}
+
+    @app.post("/api/restart", dependencies=dep)
+    async def restart():
+        """Stopt het proces; Docker (restart: unless-stopped) start het opnieuw."""
+        import os, signal
+        async def _die():
+            await asyncio.sleep(0.5)
+            os.kill(os.getpid(), signal.SIGTERM)
+        asyncio.create_task(_die())
+        return {"ok": True, "message": "Service herstart…"}
 
     # ---- UI
     @app.get("/", include_in_schema=False)

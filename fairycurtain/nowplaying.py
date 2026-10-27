@@ -202,6 +202,7 @@ class NowPlaying:
     async def _show(self, info: dict) -> None:
         w, h = self.c.layout.width, self.c.layout.height
         show = self.cfg.get("show", "cover")
+        label = "Now playing: " + " – ".join(x for x in (info.get("artist"), info.get("title")) if x)
         if self.cfg.get("movement"):
             await self.c.set_movement(self.cfg["movement"], apply=False)
         if show in ("text", "both"):
@@ -210,9 +211,9 @@ class NowPlaying:
                                      page_seconds=float(self.cfg.get("text_seconds", 6)) / 1.0,
                                      font_path=self.render_cfg.get("font_path"))
             if show == "text":
-                await self.c.play(frames, loop=True, name="nowplaying:text")
+                await self.c.play(frames, loop=True, name="nowplaying:text", source=("nowplaying", label))
                 return
-            await self.c.play(frames, loop=False, name="nowplaying:text")
+            await self.c.play(frames, loop=False, name="nowplaying:text", source=("nowplaying", label))
             # wachten tot de tekst-animatie klaar is
             while self.c.state.get("animation"):
                 await asyncio.sleep(0.5)
@@ -221,6 +222,6 @@ class NowPlaying:
                 data = await self._fetch_image(info["image"])
                 grid = R.image_bytes_to_grid(data, w, h, fit=self.cfg.get("fit", "cover"),
                                              brightness=float(self.cfg.get("brightness", 1.0)))
-                await self.c.show_grid(grid)
+                await self.c.show_grid(grid, source=("nowplaying", label))
             except Exception as e:
                 log.warning("Hoes ophalen/tonen mislukt: %s", e)
