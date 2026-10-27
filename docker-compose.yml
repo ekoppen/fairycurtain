@@ -1,20 +1,20 @@
 # FairyCurtain
 #
-# Bij transport: bleak heeft de container de Bluetooth-adapter van de host nodig:
-#   - network_mode: host  (BlueZ via D-Bus)
-#   - /var/run/dbus doorgeven
-# Op Proxmox: geef de USB-BT-dongle door aan de LXC/VM waar Docker draait, of
-# gebruik transport: esp32 (dan is geen Bluetooth op de host nodig).
+# Standaard: via de ESP32-bridge (transport: esp32). Werkt overal, ook op Mac/Windows.
 services:
   fairycurtain:
     build: .
     container_name: fairycurtain
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "8321:8321"
     volumes:
       - ./config.yaml:/config/config.yaml
-      - /var/run/dbus:/var/run/dbus:ro
-    # alleen nodig voor transport: bleak
-    cap_add: [NET_ADMIN, NET_RAW]
     # environment:
     #   FAIRY_API_KEY: geheim
+
+# Alternatief voor transport: bleak (eigen Bluetooth-adapter, alleen Linux-host):
+# vervang `ports:` door `network_mode: host`, en voeg toe:
+#     volumes:
+#       - /var/run/dbus:/var/run/dbus:ro
+#     cap_add: [NET_ADMIN, NET_RAW]
