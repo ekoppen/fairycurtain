@@ -21,12 +21,13 @@ StateCb = Callable[[dict], None]
 
 class FairyCurtain:
     def __init__(self, transport: Transport, layout: Layout, *,
-                 pixel_encoder: str = "indexed_da",
+                 pixel_encoder: str = "diy",
                  send_init: bool = True,
                  packet_delay: float = 0.03,
                  ack_timeout: float = 1.0,
                  reconnect_interval: float = 10.0,
-                 max_fps: float = 8.0) -> None:
+                 max_fps: float = 8.0,
+                 keepalive_interval: float = 30.0) -> None:
         self.transport = transport
         self.layout = layout
         self.pixel_encoder = pixel_encoder
@@ -35,13 +36,16 @@ class FairyCurtain:
         self.ack_timeout = ack_timeout
         self.reconnect_interval = reconnect_interval
         self.min_frame_time = 1.0 / max(0.1, max_fps)
+        self.keepalive_interval = keepalive_interval
 
         self.state: dict = {
             "connected": False, "power": None, "mode": None,
             "rgb": [255, 255, 255], "brightness": 100,
             "preset": None, "animation": None, "last_error": None,
-            "last_notification": None,
+            "last_notification": None, "info": None,
+            "movement": {"direction": 0, "brightness": 100, "speed": 100},
         }
+        self._keepalive_task: Optional[asyncio.Task] = None
         self.last_grid: Optional[Grid] = None
         self._lock = asyncio.Lock()
         self._ack = asyncio.Event()
@@ -76,6 +80,14 @@ class FairyCurtain:
         self.state["last_notification"] = data.hex()
         if P.is_ack(data):
             self._ack.set()
+            return
+        info = P.parse_info(data)
+        if info:
+            self.state["info"] = info
+            if info["columns"] and info["rows"] and (info["columns"], info["rows"]) != (self.layout.width, self.layout.height):
+                log.info("Gordijn meldt %dx%d (%d LED's); layout aangepast", info["columns"], info["rows"], info["pixel_count"])
+                self.layout.width, self.layout.height = info["columns"], info["rows"]
+            self._emit()
             return
         st = P.parse_notification(data)
         if st is None:
@@ -121,6 +133,19 @@ class FairyCurtain:
             log.warning("Eerste verbinding mislukt: %s (blijf proberen)", e)
         if self._reconnect_task is None:
             self._reconnect_task = asyncio.create_task(self._reconnect_loop())
+        if self._keepalive_task is None and self.keepalive_interval > 0:
+            self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+
+    async def _keepalive_loop(self) -> None:
+        """Statusvraag (AA 01 00 AB) zoals de app; houdt de link wakker en de status actueel."""
+        while True:
+            await asyncio.sleep(self.keepalive_interval)
+            if self.transport.is_connected and not self._lock.locked():
+                try:
+                    async with self._lock:
+                        await self._send(P.packet(0x01))
+                except Exception as e:
+                    log.debug("keepalive: %s", e)
 
     async def _reconnect_loop(self) -> None:
         while True:
@@ -135,9 +160,10 @@ class FairyCurtain:
 
     async def close(self) -> None:
         await self.stop_animation()
-        if self._reconnect_task:
-            self._reconnect_task.cancel()
-            self._reconnect_task = None
+        for t in (self._reconnect_task, self._keepalive_task):
+            if t:
+                t.cancel()
+        self._reconnect_task = self._keepalive_task = None
         await self.transport.disconnect()
         self._emit()
 
@@ -215,11 +241,46 @@ class FairyCurtain:
         if not self.state.get("power"):
             await self._send(P.power(True), wait_ack=True)
             self.state["power"] = True
+            await asyncio.sleep(0.1)
         await self._ensure_init()
-        for pkt in self._packets_for(grid):
-            await self._send(pkt)
+        packets = self._packets_for(grid)
+        if self.pixel_encoder == "diy":
+            # Exacte reeks en timing uit de app-capture (zie protocol.py).
+            mv = self.state["movement"]
+            await self._send(P.diy_mode(0x03, mv["direction"], mv["brightness"], mv["speed"]))
+            await asyncio.sleep(0.0165)
+            await self._send(P.diy_mode(0x00, mv["direction"], mv["brightness"], mv["speed"]))
+            await asyncio.sleep(0.25)
+            for i, pkt in enumerate(packets):
+                await self.transport.write(pkt)
+                if i < len(packets) - 1:
+                    await asyncio.sleep(0.30)
+            await asyncio.sleep(1.20)
+            await self._send(P.diy_mode(0x04, mv["direction"], mv["brightness"], mv["speed"]))
+            await asyncio.sleep(0.02)
+            await self._send(P.diy_mode(0x01, mv["direction"], mv["brightness"], mv["speed"]))
+            await asyncio.sleep(0.20)
+        else:
+            for pkt in packets:
+                await self._send(pkt)
         self.last_grid = grid
         self.state["mode"] = "pixels"
+
+    async def set_movement(self, direction=0, brightness: Optional[int] = None,
+                           speed: Optional[int] = None, apply: bool = True) -> None:
+        """Beweging/knipperen/ademen van het huidige DIY-plaatje (door het gordijn zelf)."""
+        if isinstance(direction, str):
+            direction = P.DIRECTIONS[direction]
+        mv = self.state["movement"]
+        mv["direction"] = int(direction)
+        if brightness is not None:
+            mv["brightness"] = max(0, min(100, int(brightness)))
+        if speed is not None:
+            mv["speed"] = max(0, min(100, int(speed)))
+        if apply:
+            async with self._lock:
+                await self._send(P.diy_mode(0x01, mv["direction"], mv["brightness"], mv["speed"]))
+        self._emit()
 
     async def show_grid(self, grid: Grid) -> None:
         await self.stop_animation()
@@ -232,20 +293,15 @@ class FairyCurtain:
 
     async def test_pixel(self, index: int, color=(255, 255, 255), clear: bool = True) -> None:
         """Eén fysieke pixel aanzetten (kalibratie van de layout)."""
-        await self.stop_animation()
-        pixels = [(0, 0, 0)] * self.layout.count if clear else None
-        async with self._lock:
-            if not self.state.get("power"):
-                await self._send(P.power(True), wait_ack=True)
-            await self._ensure_init()
-            enc = P.PIXEL_ENCODERS[self.pixel_encoder]
-            if pixels is None:
-                pixels = [(0, 0, 0)] * self.layout.count
-            pixels[index % self.layout.count] = tuple(color)
-            for pkt in enc(pixels, self.transport.mtu):
-                await self._send(pkt)
-        self.state["mode"] = "pixels"
-        self._emit()
+        pixels = [(0, 0, 0)] * self.layout.count
+        pixels[index % self.layout.count] = tuple(color)
+        # terug naar grid via de inverse mapping, zodat dezelfde upload-code wordt gebruikt
+        grid = self.layout.blank()
+        for i, px in enumerate(pixels):
+            if px != (0, 0, 0):
+                x, y = self.layout.xy_of(i)
+                grid[y][x] = px
+        await self.show_grid(grid)
 
     # ---------------------------------------------------------- animatie --
 

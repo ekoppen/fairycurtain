@@ -56,7 +56,7 @@
         <span style="flex:1"></span>
         <button class="primary" id="sendFrame">Stuur naar gordijn</button>
       </div>
-      <div class="muted">Klik/sleep om te tekenen. Helderheid bij versturen: <input type="range" id="frameBright" min="5" max="100" value="50"> <span id="frameBrightV">50%</span></div>
+      <div class="muted">Klik/sleep om te tekenen. Het gordijn kent per pixel alleen een <b>tint</b> (plus wit en uit): donker wordt uit, grijzig wordt wit. Helderheid stel je in bij "Beweging". <input type="hidden" id="frameBright" value="100"><span id="frameBrightV" style="display:none"></span></div>
     </section>
 
     <section class="panel">
@@ -90,15 +90,31 @@
       <div class="row">
         <input type="text" id="text" placeholder="Hallo!" style="flex:1;min-width:160px">
         <input type="color" id="textColor" value="#ffffff">
-        <label>snelheid <input type="number" id="speed" value="12" min="1" max="60" style="width:70px"></label>
-        <label><input type="checkbox" id="scroll" checked> scrollen</label>
+        <label>sec/pagina <input type="number" id="pageSec" value="4" min="1" max="60" style="width:64px"></label>
         <button class="primary" id="textBtn">Toon</button>
       </div>
+      <div class="muted">Tekst gaat in pagina's van ~3 tekens; een upload kost ~2,5 s, dus echt scrollen is te traag. Tip: korte tekst + beweging "lus links" hieronder.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Beweging (door het gordijn zelf)</h2>
+      <div class="row">
+        <select id="dir">
+          <option value="still">stil</option><option value="loop_left">lus links</option><option value="loop_right">lus rechts</option>
+          <option value="loop_up">lus omhoog</option><option value="loop_down">lus omlaag</option>
+          <option value="left">links (1x)</option><option value="right">rechts (1x)</option><option value="up">omhoog (1x)</option><option value="down">omlaag (1x)</option>
+          <option value="blink">knipperen</option><option value="breathe">ademen</option>
+        </select>
+        <label>snelheid <input type="range" id="mvSpeed" min="0" max="100" value="50"></label>
+        <label>helderheid <input type="range" id="mvBright" min="1" max="100" value="100"></label>
+        <button id="mvBtn">Toepassen</button>
+      </div>
+      <div class="muted">Werkt op het laatst geüploade plaatje; geen nieuwe upload nodig.</div>
     </section>
 
     <section class="panel">
       <h2>Kalibratie (layout)</h2>
-      <div class="muted">Licht één fysieke LED op en kijk waar die zit. Pas dan de layout aan tot het raster klopt.</div>
+      <div class="muted">Licht één fysieke LED op en kijk waar die zit (±3 s). De standaard (kolommen, boven→beneden) is bevestigd voor dit gordijn; alleen aanpassen als het niet klopt.</div>
       <div class="row">
         <label>index <input type="number" id="pix" value="0" min="0" style="width:80px"></label>
         <button id="pixPrev">◀</button><button id="pixNext">▶</button><button id="pixGo">Licht op</button>
@@ -114,7 +130,7 @@
         <button id="layoutSave">Opslaan</button>
       </div>
       <div class="row">
-        <select id="encoder"><option value="indexed_da">encoder: indexed_da</option><option value="plain_rgb">encoder: plain_rgb</option></select>
+        <select id="encoder"><option value="diy">encoder: diy (bevestigd)</option><option value="legacy_indexed_da">encoder: legacy_indexed_da</option><option value="legacy_plain_rgb">encoder: legacy_plain_rgb</option></select>
         <input type="text" id="rawHex" placeholder="raw hex, bv. aa020101ae" style="width:220px"><button id="rawBtn">Raw sturen</button>
       </div>
       <div id="log"></div>
@@ -157,7 +173,8 @@ $('#bright').oninput=e=>$('#brightV').textContent=e.target.value;
 $('#bright').onchange=e=>api('/brightness',{method:'POST',body:JSON.stringify({brightness:+e.target.value})}).then(st).catch(err);
 $('#solidBtn').onclick=()=>api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})}).then(st).catch(err);
 $('#presetBtn').onclick=()=>api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})}).then(st).catch(err);
-$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,speed:+$('#speed').value,scroll:$('#scroll').checked,brightness:+$('#frameBright').value/100})}).then(r=>log('tekst: '+r.frames+' frames')).catch(err);
+$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,page_seconds:+$('#pageSec').value})}).then(r=>log('tekst: '+r.frames+" pagina's")).catch(err);
+$('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(r=>log('beweging: richting '+r.direction)).catch(err);
 
 // kalibratie
 const pixGo=async()=>{try{const r=await api('/test/pixel',{method:'POST',body:JSON.stringify({index:+$('#pix').value,color:$('#color').value})});$('#pixHint').textContent=r.expected_xy?('verwacht op x='+r.expected_xy[0]+', y='+r.expected_xy[1]):'';initGrid();if(r.expected_xy){grid[r.expected_xy[1]][r.expected_xy[0]]=$('#color').value;draw()}}catch(e){err(e)}};

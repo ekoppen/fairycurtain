@@ -12,10 +12,11 @@ DEFAULTS = {
         "name_prefix": "Hello Fairy-",
         "adapter": None,               # bijv. hci0
         "bridge_url": "http://fairy-bridge.local",  # alleen bij transport: esp32
-        "pixel_encoder": "indexed_da",
+        "pixel_encoder": "diy",
         "send_init": True,
         "packet_delay": 0.03,
-        "max_fps": 8,
+        "max_fps": 0.4,
+        "keepalive_interval": 30,
     },
     "layout": {
         "width": 20, "height": 20, "order": "column",

@@ -18,10 +18,11 @@ def build(cfg: dict):
     dev = cfg["device"]
     curtain = FairyCurtain(
         make_transport(dev), Layout.from_dict(cfg["layout"]),
-        pixel_encoder=dev.get("pixel_encoder", "indexed_da"),
+        pixel_encoder=dev.get("pixel_encoder", "diy"),
         send_init=bool(dev.get("send_init", True)),
         packet_delay=float(dev.get("packet_delay", 0.03)),
-        max_fps=float(dev.get("max_fps", 8)),
+        max_fps=float(dev.get("max_fps", 0.4)),
+        keepalive_interval=float(dev.get("keepalive_interval", 30)),
     )
     app = create_app(curtain, cfg)
     mqtt = None

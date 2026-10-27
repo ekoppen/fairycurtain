@@ -66,11 +66,20 @@ class TextIn(BaseModel):
     text: str
     color: str = "#ffffff"
     background: str = "#000000"
-    scroll: bool = True
-    speed: float = Field(12.0, gt=0, description="pixels per seconde")
+    mode: str = Field("pages", description="pages (standaard, ~3 tekens per pagina) | scroll (traag: ~2,5 s per stap)")
+    page_seconds: float = Field(4.0, gt=0)
+    scroll: Optional[bool] = None          # legacy: True == mode scroll
+    speed: float = Field(12.0, gt=0, description="alleen bij scroll: pixels per stap-interval")
     loop: bool = True
     brightness: Optional[float] = Field(None, ge=0, le=1)
     font_size: Optional[int] = None
+    movement: Optional[str] = Field(None, description="beweging door het gordijn zelf, bv. loop_left, blink, breathe")
+
+
+class MovementIn(BaseModel):
+    direction: str | int = Field("still", description=f"één van {list(P.DIRECTIONS)} of 0-10")
+    brightness: Optional[int] = Field(None, ge=0, le=100)
+    speed: Optional[int] = Field(None, ge=0, le=100)
 
 
 class ImageB64In(BaseModel):
@@ -196,12 +205,29 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
     @app.post("/api/text", dependencies=dep)
     async def text(body: TextIn):
         w, h = _wh()
-        frames = R.text_to_frames(body.text, w, h, color=R.hex_to_rgb(body.color),
-                                  background=R.hex_to_rgb(body.background), scroll=body.scroll,
-                                  speed=body.speed, font_path=render_cfg.get("font_path"),
-                                  font_size=body.font_size, brightness=_bright(body.brightness))
+        if body.movement is not None:
+            await curtain.set_movement(body.movement, apply=False)
+        mode = "scroll" if body.scroll else body.mode
+        if mode == "scroll":
+            frames = R.text_to_frames(body.text, w, h, color=R.hex_to_rgb(body.color),
+                                      background=R.hex_to_rgb(body.background), scroll=True,
+                                      speed=body.speed, font_path=render_cfg.get("font_path"),
+                                      font_size=body.font_size)
+        else:
+            frames = R.text_to_pages(body.text, w, h, color=R.hex_to_rgb(body.color),
+                                     background=R.hex_to_rgb(body.background), page_seconds=body.page_seconds,
+                                     font_path=render_cfg.get("font_path"), font_size=body.font_size)
         await curtain.play(frames, loop=body.loop, name=f"text:{body.text[:20]}")
-        return {"ok": True, "frames": len(frames)}
+        return {"ok": True, "frames": len(frames), "mode": mode}
+
+    @app.post("/api/movement", dependencies=dep)
+    async def movement(body: MovementIn):
+        """Laat het gordijn het huidige plaatje bewegen/knipperen/ademen (geen nieuwe upload nodig)."""
+        try:
+            await curtain.set_movement(body.direction, body.brightness, body.speed)
+        except KeyError:
+            raise HTTPException(400, f"Onbekende richting; keuze uit {list(P.DIRECTIONS)} of 0-10")
+        return curtain.state["movement"]
 
     @app.post("/api/animation/stop", dependencies=dep)
     async def stop():

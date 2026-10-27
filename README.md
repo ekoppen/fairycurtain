@@ -57,7 +57,8 @@ Alle endpoints onder `/api`, JSON. Met `api_key` ingesteld: header `X-API-Key`.
 | `POST /frame` | eigen raster | `{"hex": ["#ff0000", … 400×]}` of `{"pixels": [[[r,g,b],…],…]}` |
 | `POST /image` | multipart upload (PNG/JPG/GIF) | velden `file`, `fit`, `brightness` |
 | `POST /image/base64` | afbeelding als base64 | `{"data":"…","fit":"cover"}` |
-| `POST /text` | (scrollende) tekst | `{"text":"Hoi","color":"#00ffff","speed":12}` |
+| `POST /text` | tekst in pagina's | `{"text":"Hoi","color":"#00ffff","page_seconds":4,"movement":"loop_left"}` |
+| `POST /movement` | plaatje bewegen/knipperen/ademen | `{"direction":"loop_left","speed":40,"brightness":80}` |
 | `POST /animation/stop` | animatie stoppen | |
 | `POST /clear` | alles zwart | |
 | `GET /frame/preview.png` | laatst getoonde frame | |
@@ -91,27 +92,20 @@ Voor automatiseringen zijn er command-topics (`fairycurtain/cmd/text`, `/cmd/ima
    - eerste sliert rechts → `flip_x`; index 0 onderaan → `flip_y`.
 4. Opslaan. Teken iets asymmetrisch (een pijl) en controleer.
 
-## Pixelprotocol: eerlijk verhaal
+## Pixelprotocol (bevestigd)
 
-Aan/uit, kleur, helderheid, presets en statusmeldingen zijn door meerdere mensen onafhankelijk bevestigd (o.a. de HA-integratie `nzrutman/hello_fairy_ble`). Voor de **per-pixel/plaatjes-modus** is minder zekerheid: de PyPI-bibliotheek `blecontroller` zegt dat het onderstaande werkt op een 20×20 Hello Fairy-gordijn en dat formaat is hier de standaard (`pixel_encoder: indexed_da`):
+Het per-pixel protocol komt uit een Bluetooth-capture van de officiële app plus de APK, uitgezocht door **kmich** (fork van `nzrutman/hello_fairy_ble`, branch `curtain-studio-rc5`, `PROTOCOL.md`) en fysiek bevestigd op een 20×20-gordijn. Bijzonderheden die je merkt in de praktijk:
 
-```
-AA DA LEN PAGE [IDX_HI IDX_LO R G B]… CS
-```
+- Het gordijn kent per pixel alleen een **tint** (0–180 = hue/2), plus **wit** (255) en **uit** (254). Geen helderheid of pastel per pixel; de editor laat donkere kleuren "uit" worden en grijzige kleuren wit. Helderheid is globaal (bij "Beweging").
+- Een upload is precies zes pakketten (5×242 + 20 bytes) met vaste tussenpozen; totaal ≈ 2,5 s. Daarom is een frame-animatie traag (`max_fps: 0.4`). Beweging, knipperen en ademen van een plaatje doet het gordijn zelf (`POST /api/movement`), zonder nieuwe upload.
+- Index = kolom × 20 + rij (slierten van boven naar beneden): de standaard-layout. Het gordijn meldt zijn afmetingen zelf (`info` in `/api/status`).
 
-Een andere capture toonde pakketten met commandobyte `0xD1`. Werkt `indexed_da` niet (LED's reageren niet of chaotisch op "Licht op"), probeer `plain_rgb`, en anders is dit de zekere weg:
-
-1. Android-telefoon: Ontwikkelaarsopties → **Bluetooth HCI-snoop-log** aan, Bluetooth uit/aan.
-2. In de Hello Fairy-app in de DIY/plaatjes-editor **één** simpel plaatje sturen (bv. één rode pixel linksboven).
-3. `adb bugreport` (log zit in `FS/data/misc/bluetooth/logs/btsnoop_hci.log`) en dan
-   `python tools/btsnoop_writes.py btsnoop_hci.log`
-4. Je ziet exact welke bytes de app stuurt. Plak die in deze chat, dan maak ik de encoder passend — of voeg zelf een functie toe aan `PIXEL_ENCODERS` in `protocol.py`; alles daarboven (editor, API, HA) blijft gelijk.
-
-Handig daarbij: `POST /api/raw` stuurt willekeurige bytes, dus je kunt een gesnifte write letterlijk herhalen om te zien of het gordijn hetzelfde doet.
+De oude gissingen staan er nog als `legacy_*`-encoders; het gordijn negeert ze. `tools/btsnoop_writes.py` blijft handig om zelf nieuwe commando's te ontdekken (muziekmodus, timers, twee-plaatjes-animatie staan in kmich's `PROTOCOL.md` beschreven en zijn een logische volgende uitbreiding).
 
 ## Beperkingen
 
-- BLE is traag: reken op ~3–8 frames per seconde voor volledige 400-pixel frames (`max_fps` in config). Scrollende tekst is daarmee prima; vloeiende video niet.
+- Een volledig plaatje uploaden kost ≈ 2,5 s. Tekst gaat daarom in pagina's van ~3 tekens; GIF's worden een diashow. Voor beweging gebruik je de ingebouwde bewegingen van het gordijn.
+- Eén tint per pixel: foto's worden "posterized". Pixel-art, iconen en tekst zien er goed uit.
 - Eén verbinding tegelijk: de telefoon-app en deze service kunnen niet samen.
 - De IR-afstandsbediening blijft werken; statuswijzigingen daarvan komen als notificatie binnen en worden doorgegeven aan HA.
 

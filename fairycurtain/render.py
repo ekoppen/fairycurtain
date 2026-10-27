@@ -135,6 +135,48 @@ def text_to_frames(
     return frames
 
 
+def text_to_pages(
+    text: str, width: int, height: int, color: RGB = (255, 255, 255), background: RGB = (0, 0, 0),
+    page_seconds: float = 4.0, font_path: Optional[str] = None, font_size: Optional[int] = None,
+) -> List[Frame]:
+    """
+    Tekst in 'pagina's' die elk in width x height passen (bv. 3 tekens per pagina
+    bij 20 px). Geschikt voor het gordijn, waar een frame ~2,5 s kost om te uploaden.
+    """
+    words = text.split()
+    pages: List[str] = []
+    cur = ""
+    def fits(t: str) -> bool:
+        return render_text_strip(t, height, color, background, font_path, font_size).width <= width
+    for w in words:
+        cand = (cur + " " + w).strip()
+        if fits(cand):
+            cur = cand
+            continue
+        if cur:
+            pages.append(cur)
+            cur = ""
+        # woord zelf te lang: in stukken knippen
+        piece = ""
+        for ch in w:
+            if fits(piece + ch):
+                piece += ch
+            else:
+                pages.append(piece)
+                piece = ch
+        cur = piece
+    if cur:
+        pages.append(cur)
+    frames: List[Frame] = []
+    for pg in pages or [""]:
+        strip = render_text_strip(pg, height, color, background, font_path, font_size)
+        canvas = Image.new("RGB", (width, height), background)
+        canvas.paste(strip, ((width - strip.width) // 2, 0))
+        px = canvas.load()
+        frames.append(([[tuple(px[x, y]) for x in range(width)] for y in range(height)], page_seconds))  # type: ignore
+    return frames
+
+
 # -------------------------------------------------------------- helpers ----
 
 def solid(width: int, height: int, color: RGB) -> Grid:

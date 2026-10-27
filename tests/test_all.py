@@ -44,6 +44,17 @@ def test_pixel_encoder_covers_all_pixels():
     assert seen == {i: pixels[i] for i in range(400)}
 
 
+def test_diy_vectors():
+    # uit kmich/PROTOCOL.md: groen -> 0x3C, blauw -> 0x78, D0-vector "aad00403641401fa"
+    assert P.rgb_to_pixel_byte(0, 255, 0) == 0x3C and P.rgb_to_pixel_byte(0, 0, 255) == 0x78
+    assert P.diy_mode(1, 3, 100, 20).hex() == "aad00403641401fa"
+    assert P.diy_mode(3).hex() == "aad0040064640349"
+    pk = P.encode_pixels_diy([(255, 0, 0)] * 400)
+    assert [len(p) for p in pk] == [242] * 5 + [20] and pk[0][:5].hex() == "aadaee0100"
+    info = P.parse_info(bytes.fromhex("aa001f342e372e32323530323500000000000000000000019014011402030207080393"))
+    assert info == {"firmware": "4.7.225025", "pixel_count": 400, "columns": 20, "rows": 20, "diy_type": 3}
+
+
 def test_notification_parse():
     st = P.parse_notification(bytes.fromhex("aa010b000000" "01" "01" "0167" "03e8" "01f4" "00"))
     assert st.power and st.mode == 1 and (st.h, st.s, st.v) == (359, 1000, 500)
@@ -79,7 +90,7 @@ def test_render_image_and_text():
 @pytest.fixture
 def setup():
     t = FakeTransport()
-    c = FairyCurtain(t, Layout(), packet_delay=0.0, max_fps=100)
+    c = FairyCurtain(t, Layout(), packet_delay=0.0, max_fps=100, keepalive_interval=0)
     cfg = {**DEFAULTS, "api": {"api_key": "geheim"}, "render": {"brightness": 1.0}}
     return t, c, create_app(c, cfg)
 
@@ -101,12 +112,17 @@ async def test_api_flow(setup):
         n = len(t.writes)
         r = await ac.post("/api/frame", json={"hex": ["#010203"] * 400}, headers=h)
         assert r.json()["ok"] and len(t.writes) > n
-        assert any(w[1] == 0xDA for w in t.writes[n:])
+        da = [w for w in t.writes[n:] if w[1] == 0xDA]
+        assert [len(w) for w in da] == [242] * 5 + [20]
+        d0 = [w for w in t.writes[n:] if w[1] == 0xD0]
+        assert [w[6] for w in d0] == [0x03, 0x00, 0x04, 0x01]   # volgorde uit de capture
         r = await ac.post("/api/test/pixel", json={"index": 21}, headers=h)
         assert r.json()["expected_xy"] == [1, 1]
-        r = await ac.post("/api/text", json={"text": "Hallo wereld", "speed": 50}, headers=h)
-        assert r.json()["frames"] > 5
-        await asyncio.sleep(0.2)
+        r = await ac.post("/api/text", json={"text": "Hallo wereld dit is een test", "page_seconds": 0.1}, headers=h)
+        assert r.json()["frames"] >= 4 and r.json()["mode"] == "pages"
+        r = await ac.post("/api/movement", json={"direction": "loop_left", "speed": 30}, headers=h)
+        assert r.json()["direction"] == 9 and t.writes[-1] == P.diy_mode(1, 9, 100, 30)
+        await asyncio.sleep(0.5)
         assert c.state["animation"] is not None
         r = await ac.post("/api/animation/stop", headers=h)
         assert r.json()["animation"] is None

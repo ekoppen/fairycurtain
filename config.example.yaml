@@ -6,10 +6,11 @@ device:
   name_prefix: "Hello Fairy-"
   adapter: null               # bv. hci0 (alleen bleak op Linux)
   bridge_url: "http://192.168.1.60"   # alleen bij transport: esp32
-  pixel_encoder: indexed_da   # indexed_da | plain_rgb  (zie README, "Pixelprotocol")
+  pixel_encoder: diy          # diy = bevestigd app-protocol | legacy_* alleen voor experimenten
   send_init: true             # init-reeks zoals de app die stuurt
   packet_delay: 0.03          # seconden tussen pixel-pakketten
-  max_fps: 8
+  max_fps: 0.4                # een DIY-upload kost ~2,5 s; animaties zijn dus traag
+  keepalive_interval: 30      # statusvraag om de link wakker te houden (0 = uit)
 
 layout:                       # pas aan na kalibratie in de webeditor
   width: 20

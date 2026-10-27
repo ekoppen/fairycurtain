@@ -13,19 +13,22 @@ Bevestigde commando's:
     preset      AA 03 04 02 PP VVVV CS         (PP 1-58, V 0-1000)
     ACK         AA 02 00 AC  /  AA 03 00 AD
 
-Per-pixel ("DIY"/afbeelding) modus
-----------------------------------
-Hier bestaan twee waarnemingen van, die elkaar niet bevestigen:
+Per-pixel ("DIY"/afbeelding) modus  — BEVESTIGD (kmich, btsnoop-capture van
+de officiële app + APK, fysiek getest op een 20x20-gordijn):
 
-  * `blecontroller` (PyPI, "getest op 20x20 Hello Fairy"):
-        AA DA LEN  PAGE  [IDX_HI IDX_LO R G B]*  CS
-  * een btsnoop-capture in de HA-community thread toont pakketten
-        AA D1 03 00 00 96 BB  (checksum klopt NIET met de som-regel)
+    * per pixel één kleurbyte: 0..180 = tint (hue/2), 254 = uit, 255 = wit
+      (geen helderheid/verzadiging per pixel; wel globaal via D0)
+    * index = kolom*20 + rij  (slierten van boven naar beneden)
+    * volgorde:  D0(03)  D0(00)  →250ms→  6x DA (79 px, 242 bytes, 300ms apart)
+                 →1.2s→  D0(04)  D0(01)
+    * DA-payload = [01, idx_hi, idx_lo, kleur]*79.  Kleinere pakketten werken
+      NIET: het gordijn houdt dan alleen het laatste pakket. MTU >= 245 nodig.
+    * D0-payload = [richting, helderheid 0-100, snelheid 0-100, actie]
+      richting: 0 stil, 1-4 omhoog/omlaag/links/rechts, 5 knipper, 6 adem,
+      7-10 lus omhoog/omlaag/links/rechts.  actie 1 = plaatje tonen.
 
-De eerste is als standaard-encoder geïmplementeerd ("indexed_da"). Of jouw
-gordijn dit slikt, test je met `POST /api/test/pixel`. Klopt het niet, dan
-sniff je de app één keer met `tools/btsnoop_writes.py` en voeg je hieronder
-een encoder toe aan PIXEL_ENCODERS (zie README, hoofdstuk "Pixelprotocol").
+De eerdere gissingen (indexed_da met RGB, plain_rgb) staan nog als "legacy"
+encoders voor experimenten; het gordijn negeert ze stil (geen ACK).
 """
 from __future__ import annotations
 
@@ -164,9 +167,84 @@ def encode_pixels_plain_rgb(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes
 
 
 PIXEL_ENCODERS: dict[str, PixelEncoder] = {
-    "indexed_da": encode_pixels_indexed_da,
-    "plain_rgb": encode_pixels_plain_rgb,
+    "diy": None,  # type: ignore  # wordt hieronder ingevuld (bevestigd formaat)
+    "legacy_indexed_da": encode_pixels_indexed_da,
+    "legacy_plain_rgb": encode_pixels_plain_rgb,
 }
+
+
+
+# ----------------------------------------------------------- DIY (echt) ----
+
+CMD_DIY_MODE = 0xD0
+CMD_DIY_DATA = 0xDA
+PIXEL_OFF = 0xFE
+PIXEL_WHITE = 0xFF
+DIY_PIXELS_PER_PACKET = 79
+DIY_MIN_MTU = 245
+
+DIRECTIONS = {"still": 0, "up": 1, "down": 2, "left": 3, "right": 4, "blink": 5, "breathe": 6,
+              "loop_up": 7, "loop_down": 8, "loop_left": 9, "loop_right": 10}
+
+
+def rgb_to_pixel_byte(r: int, g: int, b: int, off_below: float = 0.05, white_below: float = 0.10) -> int:
+    """RGB → één DIY-kleurbyte (tint). Donker → uit, onverzadigd → wit."""
+    hf, sf, vf = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+    if vf <= off_below:
+        return PIXEL_OFF
+    if sf <= white_below:
+        return PIXEL_WHITE
+    return min(180, max(0, int(round(hf * 360 / 2.0))))
+
+
+def pixel_byte_to_rgb(c: int) -> RGB:
+    """Omgekeerde (voor preview): wat het gordijn ongeveer laat zien."""
+    if c == PIXEL_OFF:
+        return (0, 0, 0)
+    if c == PIXEL_WHITE:
+        return (255, 255, 255)
+    r, g, b = colorsys.hsv_to_rgb((min(180, c) * 2) / 360, 1.0, 1.0)
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def diy_mode(action: int, direction: int = 0, brightness: int = 100, speed: int = 100) -> bytes:
+    """D0: [richting, helderheid, snelheid, actie]. Capture gebruikte 00 64 64 xx."""
+    return packet(CMD_DIY_MODE, bytes([direction & 0xFF, max(0, min(100, brightness)),
+                                       max(0, min(100, speed)), action & 0xFF]))
+
+
+def encode_pixels_diy(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes]:
+    """
+    400 RGB-pixels (op fysieke index) → precies 6 DA-pakketten (5x242 + 1x20 bytes).
+    Let op: moet in exact deze chunks; zie docstring bovenaan.
+    """
+    if mtu < DIY_MIN_MTU:
+        raise ValueError(f"DIY-upload heeft MTU >= {DIY_MIN_MTU} nodig (nu {mtu})")
+    out: List[bytes] = []
+    for start in range(0, len(pixels), DIY_PIXELS_PER_PACKET):
+        chunk = pixels[start:start + DIY_PIXELS_PER_PACKET]
+        payload = bytes([0x01])
+        for idx, (r, g, b) in enumerate(chunk, start=start):
+            payload += struct.pack(">H", idx) + bytes([rgb_to_pixel_byte(r, g, b)])
+        out.append(packet(CMD_DIY_DATA, payload))
+    return out
+
+
+def parse_info(data: bytes) -> Optional[dict]:
+    """Antwoord op AA 00 00 AA: versie, aantal LED's, kolommen, rijen, DIY-type."""
+    if len(data) < 4 or data[0] != PREFIX or data[1] != 0x00:
+        return None
+    pl = data[3:3 + data[2]]
+    if len(pl) < 27:
+        return None
+    return {
+        "firmware": pl[:20].split(b"\x00", 1)[0].decode(errors="replace"),
+        "pixel_count": struct.unpack(">H", pl[20:22])[0],
+        "columns": pl[22], "rows": pl[24], "diy_type": pl[26],
+    }
+
+
+PIXEL_ENCODERS["diy"] = encode_pixels_diy
 
 
 # ---------------------------------------------------------- notificaties ----

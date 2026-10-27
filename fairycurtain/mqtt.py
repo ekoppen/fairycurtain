@@ -154,10 +154,11 @@ class MqttBridge:
             await c.stop_animation()
         elif cmd == "text":
             d = json.loads(text) if text.startswith("{") else {"text": text}
-            frames = R.text_to_frames(d.get("text", ""), w, h, color=R.hex_to_rgb(d.get("color", "#ffffff")),
-                                      scroll=d.get("scroll", True), speed=float(d.get("speed", 12)),
-                                      brightness=float(d.get("brightness", bright)),
-                                      font_path=self.render_cfg.get("font_path"))
+            frames = R.text_to_pages(d.get("text", ""), w, h, color=R.hex_to_rgb(d.get("color", "#ffffff")),
+                                     page_seconds=float(d.get("page_seconds", 4)),
+                                     font_path=self.render_cfg.get("font_path"))
+            if d.get("movement"):
+                await c.set_movement(d["movement"], apply=False)
             await c.play(frames, loop=d.get("loop", True), name="text")
             await self._client.publish(f"{self.base}/text/state", d.get("text", ""))
         elif cmd == "image":
@@ -179,5 +180,8 @@ class MqttBridge:
             hexes = d["hex"]
             grid = [[R.hex_to_rgb(hexes[y * w + x]) for x in range(w)] for y in range(h)]
             await c.show_grid(grid)
+        elif cmd == "movement":
+            d = json.loads(text) if text.startswith("{") else {"direction": text}
+            await c.set_movement(d.get("direction", "still"), d.get("brightness"), d.get("speed"))
         elif cmd == "raw":
             await c.send_raw(bytes.fromhex(text.replace(" ", "")))
