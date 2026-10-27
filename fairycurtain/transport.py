@@ -135,7 +135,7 @@ class Esp32Transport(Transport):
     """
     name = "esp32"
 
-    def __init__(self, base_url: str, address: Optional[str] = None, poll_interval: float = 0.5) -> None:
+    def __init__(self, base_url: str, address: Optional[str] = None, poll_interval: float = 2.0) -> None:
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.address = address
@@ -173,8 +173,10 @@ class Esp32Transport(Transport):
                 for h in (res.get("queue") or []) if isinstance(res, dict) else []:
                     if self._notify_cb:
                         self._notify_cb(bytes.fromhex(h))
-                st = await self._http("GET", "/status")
-                self._connected = bool(isinstance(st, dict) and st.get("connected"))
+                self._status_tick = getattr(self, "_status_tick", 0) + 1
+                if self._status_tick % 5 == 0:   # status maar 1x per 10 s
+                    st = await self._http("GET", "/status")
+                    self._connected = bool(isinstance(st, dict) and st.get("connected"))
             except asyncio.CancelledError:
                 raise
             except Exception as e:

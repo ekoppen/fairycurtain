@@ -40,6 +40,7 @@ WebServer server(80);
 NimBLEClient* client = nullptr;
 NimBLERemoteCharacteristic* writeChar = nullptr;
 String connectedMac = "";
+int lastRssi = 0; unsigned long lastRssiAt = 0;
 String notifyQueue[32];
 volatile int qHead = 0, qTail = 0;
 
@@ -98,7 +99,7 @@ static void hStatus() {
   String s = "{\"connected\":" + String(isConnected() ? "true" : "false");
   s += ",\"mtu\":" + String(isConnected() ? client->getMTU() : 23);
   s += ",\"mac\":\"" + connectedMac + "\"";
-  s += ",\"rssi\":" + String(isConnected() ? client->getRssi() : 0) + "}";
+  s += ",\"rssi\":" + String(isConnected() ? lastRssi : 0) + "}";
   sendJson(s);
 }
 static void hConnect() {
@@ -160,4 +161,9 @@ void setup() {
   server.begin();
 }
 
-void loop() { server.handleClient(); delay(1); }
+void loop() {
+  server.handleClient();
+  // RSSI hooguit elke 10 s opvragen (kost een BLE-rondreis); nooit vanuit /status zelf.
+  if (isConnected() && millis() - lastRssiAt > 10000) { lastRssi = client->getRssi(); lastRssiAt = millis(); }
+  delay(2);
+}
