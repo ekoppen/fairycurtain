@@ -239,10 +239,24 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         await curtain.show_solid(0, 0, 0)
         return {"ok": True}
 
+    def _quantized(grid):
+        """Zoals het gordijn het toont: per pixel tint / wit / uit."""
+        return [[P.pixel_byte_to_rgb(P.rgb_to_pixel_byte(*px)) for px in row] for row in grid]
+
     @app.get("/api/frame/preview.png", dependencies=dep)
-    async def preview():
+    async def preview(raw: bool = False):
         grid = curtain.last_grid or curtain.layout.blank()
-        return Response(R.grid_to_png(grid, 12), media_type="image/png")
+        return Response(R.grid_to_png(grid if raw else _quantized(grid), 12), media_type="image/png",
+                        headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/frame", dependencies=dep)
+    async def current_frame(raw: bool = False):
+        """Laatst verstuurde frame als hex-lijst (rij voor rij), zoals /api/frame het aanneemt."""
+        grid = curtain.last_grid or curtain.layout.blank()
+        g = grid if raw else _quantized(grid)
+        return {"width": curtain.layout.width, "height": curtain.layout.height,
+                "hex": ["#%02x%02x%02x" % tuple(px) for row in g for px in row],
+                "animation": curtain.state.get("animation"), "mode": curtain.state.get("mode")}
 
     # ---- kalibratie / debug
     @app.post("/api/test/pixel", dependencies=dep)

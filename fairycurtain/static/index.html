@@ -42,7 +42,15 @@
   <div class="stack">
     <section class="panel">
       <h2>Tekenen</h2>
-      <canvas id="grid"></canvas>
+      <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;align-items:start">
+        <canvas id="grid"></canvas>
+        <div>
+          <div class="muted" style="margin-bottom:4px">Nu op het gordijn</div>
+          <canvas id="live" width="20" height="20" style="width:120px;height:120px;background:#000;border-radius:6px;image-rendering:pixelated"></canvas>
+          <div class="muted" id="liveInfo" style="margin-top:4px;min-height:1.2em"></div>
+          <button id="liveLoad" style="margin-top:6px;width:100%">Laad in editor</button>
+        </div>
+      </div>
       <div class="row">
         <input type="color" id="color" value="#ff8800">
         <div class="pal" id="pal"></div>
@@ -170,7 +178,7 @@ $('#clearBtn').onclick=()=>{initGrid()};
 $('#mirrorBtn').onclick=()=>{grid=grid.map(r=>[...r].reverse());draw()};
 ['#ff0000','#ff8800','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff','#ff69b4','#8000ff','#000000'].forEach(c=>{const s=document.createElement('span');s.style.background=c;s.onclick=()=>$('#color').value=c;$('#pal').appendChild(s)});
 $('#frameBright').oninput=e=>$('#frameBrightV').textContent=e.target.value+'%';
-$('#sendFrame').onclick=async()=>{try{const hex=grid.flat();const r=await api('/frame',{method:'POST',body:JSON.stringify({hex,brightness:+$('#frameBright').value/100})});log('frame verstuurd ('+r.packets+' pakketten)')}catch(e){log('fout: '+e.message)}};
+$('#sendFrame').onclick=async()=>{try{const hex=grid.flat();const r=await api('/frame',{method:'POST',body:JSON.stringify({hex,brightness:+$('#frameBright').value/100})});log('frame verstuurd ('+r.packets+' pakketten)');liveLoad()}catch(e){log('fout: '+e.message)}};
 
 // afbeelding → raster (client-side preview)
 $('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return;const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const fit=$('#fit').value;let sx=0,sy=0,sw=img.width,sh=img.height,dx=0,dy=0,dw=W,dh=H;
@@ -197,6 +205,11 @@ $('#layoutSave').onclick=()=>api('/layout',{method:'PUT',body:JSON.stringify({wi
 $('#encoder').onchange=e=>api('/encoder?name='+e.target.value,{method:'POST'}).then(r=>log('encoder: '+r.pixel_encoder)).catch(err);
 $('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>log('raw verstuurd: '+r.sent)).catch(err);
 
+let liveHex=null;
+async function liveLoad(){try{const f=await api('/frame');liveHex=f.hex;const c=$('#live');if(c.width!==f.width){c.width=f.width;c.height=f.height}
+  const x=c.getContext('2d');for(let i=0;i<f.hex.length;i++){x.fillStyle=f.hex[i];x.fillRect(i%f.width,Math.floor(i/f.width),1,1)}
+  $('#liveInfo').textContent=f.animation?('▶ '+f.animation):(f.mode==='pixels'?'plaatje':(f.mode||''))}catch(e){}}
+$('#liveLoad').onclick=()=>{if(!liveHex)return;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=liveHex[y*W+x];if(v!==undefined)grid[y][x]=v}draw();log('frame van gordijn geladen')};
 async function npLoad(){try{const s=await api('/nowplaying');$('#npEnabled').checked=!!s.enabled;$('#npSource').textContent=s.source||'–';const c=s.current||{};
   $('#npTitle').textContent=c.title||'niets bekend';$('#npArtist').textContent=[c.artist,c.playing===false?'(gepauzeerd)':''].filter(Boolean).join(' ');
   const img=$('#npCover');if(c.image){img.src=c.image;img.style.display='block'}else img.style.display='none'}catch(e){}}
@@ -206,7 +219,7 @@ function applyLayout(l){W=l.width;H=l.height;$('#lw').value=W;$('#lh').value=H;$
 function st(s){const c=$('#conn');c.className=s.connected?'on':'';c.innerHTML='verbinding: <b>'+(s.connected?'verbonden':'niet verbonden')+'</b>'+(s.transport&&s.transport.address?' · '+s.transport.address:'')+(s.power!=null?' · '+(s.power?'aan':'uit'):'')+(s.animation?' · ▶ '+s.animation:'')+(s.last_error?' · ⚠ '+s.last_error:'');if(s.brightness){$('#bright').value=s.brightness;$('#brightV').textContent=s.brightness}}
 function err(e){log('fout: '+(e.message||e))}
 (async()=>{try{const s=await api('/status');applyLayout(s.layout);$('#encoder').value=s.pixel_encoder;st(s);const p=await api('/presets');p.presets.forEach(x=>{const o=document.createElement('option');o.value=x.number;o.textContent=x.number+' · '+x.name;$('#preset').appendChild(o)})}catch(e){err(e);initGrid()}
-  npLoad();setInterval(()=>{api('/status').then(st).catch(()=>{});npLoad()},5000)})();
+  npLoad();liveLoad();setInterval(()=>{api('/status').then(st).catch(()=>{});npLoad();liveLoad()},3000)})();
 </script>
 </body>
 </html>
