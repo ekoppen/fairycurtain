@@ -80,6 +80,9 @@ static bool connectCurtain(String mac) {
   if (mac.length() == 0) return false;
   if (!client) { client = NimBLEDevice::createClient(); client->setClientCallbacks(new ClientCb(), true); }
   client->setConnectTimeout(10000);
+  // Ruime verbindingsparameters: interval 30-50 ms, supervision timeout 5 s.
+  // Voorkomt dat een zwakke link (wifi+BLE op één antenne) meteen verloopt.
+  client->setConnectionParams(24, 40, 0, 500);
   // Hello Fairy gebruikt een random BLE-adres (begint vaak met 0xBE/0xCx): eerst random, dan public.
   if (!client->connect(NimBLEAddress(mac.c_str(), BLE_ADDR_RANDOM)) &&
       !client->connect(NimBLEAddress(mac.c_str(), BLE_ADDR_PUBLIC))) return false;
