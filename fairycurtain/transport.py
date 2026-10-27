@@ -155,8 +155,17 @@ class Esp32Transport(Transport):
             return await r.text()
 
     async def connect(self) -> None:
-        params = {"mac": self.address} if self.address else {}
-        res = await self._http("POST", "/connect", params=params)
+        import aiohttp
+        res = None
+        if self.address:
+            try:
+                res = await self._http("POST", "/connect", params={"mac": self.address})
+            except aiohttp.ClientResponseError as e:
+                if e.status != 503:
+                    raise
+                log.warning("Verbinden op MAC %s mislukt; bridge gaat scannen op naam", self.address)
+        if not (isinstance(res, dict) and res.get("connected")):
+            res = await self._http("POST", "/connect")
         if not (isinstance(res, dict) and res.get("connected")):
             raise ConnectionError(f"ESP32-bridge kon niet verbinden: {res}")
         self.mtu = int(res.get("mtu", 23))
