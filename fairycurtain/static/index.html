@@ -86,6 +86,20 @@
     </section>
 
     <section class="panel">
+      <h2>Now playing</h2>
+      <div class="row">
+        <label><input type="checkbox" id="npEnabled"> volgen (bron: <span id="npSource">–</span>)</label>
+        <span style="flex:1"></span>
+        <button id="npRefresh">Vernieuw</button>
+      </div>
+      <div class="row" id="npNow" style="align-items:center;gap:12px">
+        <img id="npCover" alt="" style="width:56px;height:56px;border-radius:6px;background:#000;object-fit:cover;display:none">
+        <div><div id="npTitle" class="muted">niets bekend</div><div id="npArtist" class="muted"></div></div>
+      </div>
+      <div class="muted">Zodra het nummer wisselt gaan artiest/titel en daarna de hoes naar het gordijn. Instellen in config.yaml → nowplaying.</div>
+    </section>
+
+    <section class="panel">
       <h2>Tekst</h2>
       <div class="row">
         <input type="text" id="text" placeholder="Hallo!" style="flex:1;min-width:160px">
@@ -183,11 +197,16 @@ $('#layoutSave').onclick=()=>api('/layout',{method:'PUT',body:JSON.stringify({wi
 $('#encoder').onchange=e=>api('/encoder?name='+e.target.value,{method:'POST'}).then(r=>log('encoder: '+r.pixel_encoder)).catch(err);
 $('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>log('raw verstuurd: '+r.sent)).catch(err);
 
+async function npLoad(){try{const s=await api('/nowplaying');$('#npEnabled').checked=!!s.enabled;$('#npSource').textContent=s.source||'–';const c=s.current||{};
+  $('#npTitle').textContent=c.title||'niets bekend';$('#npArtist').textContent=[c.artist,c.playing===false?'(gepauzeerd)':''].filter(Boolean).join(' ');
+  const img=$('#npCover');if(c.image){img.src=c.image;img.style.display='block'}else img.style.display='none'}catch(e){}}
+$('#npEnabled').onchange=e=>api('/nowplaying/enable?enabled='+e.target.checked,{method:'POST'}).then(s=>log('now playing '+(s.enabled?'aan':'uit'))).catch(err);
+$('#npRefresh').onclick=npLoad;
 function applyLayout(l){W=l.width;H=l.height;$('#lw').value=W;$('#lh').value=H;$('#lorder').value=l.order;$('#lserp').checked=l.serpentine;$('#lfx').checked=l.flip_x;$('#lfy').checked=l.flip_y;initGrid();}
 function st(s){const c=$('#conn');c.className=s.connected?'on':'';c.innerHTML='verbinding: <b>'+(s.connected?'verbonden':'niet verbonden')+'</b>'+(s.transport&&s.transport.address?' · '+s.transport.address:'')+(s.power!=null?' · '+(s.power?'aan':'uit'):'')+(s.animation?' · ▶ '+s.animation:'')+(s.last_error?' · ⚠ '+s.last_error:'');if(s.brightness){$('#bright').value=s.brightness;$('#brightV').textContent=s.brightness}}
 function err(e){log('fout: '+(e.message||e))}
 (async()=>{try{const s=await api('/status');applyLayout(s.layout);$('#encoder').value=s.pixel_encoder;st(s);const p=await api('/presets');p.presets.forEach(x=>{const o=document.createElement('option');o.value=x.number;o.textContent=x.number+' · '+x.name;$('#preset').appendChild(o)})}catch(e){err(e);initGrid()}
-  setInterval(()=>api('/status').then(st).catch(()=>{}),5000)})();
+  npLoad();setInterval(()=>{api('/status').then(st).catch(()=>{});npLoad()},5000)})();
 </script>
 </body>
 </html>
