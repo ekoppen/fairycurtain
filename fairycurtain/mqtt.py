@@ -28,7 +28,8 @@ log = logging.getLogger("fairycurtain.mqtt")
 
 
 class MqttBridge:
-    def __init__(self, curtain: FairyCurtain, cfg: dict, render_cfg: dict) -> None:
+    def __init__(self, curtain: FairyCurtain, cfg: dict, render_cfg: dict, nowplaying=None) -> None:
+        self.nowplaying = nowplaying
         self.c = curtain
         self.cfg = cfg
         self.render_cfg = render_cfg
@@ -67,6 +68,9 @@ class MqttBridge:
                     await self._publish_state()
                     await client.subscribe(f"{self.base}/light/set")
                     await client.subscribe(f"{self.base}/cmd/#")
+                    np_topic = (self.nowplaying.cfg.get("topic") if self.nowplaying else None)
+                    if np_topic:
+                        await client.subscribe(np_topic)
                     log.info("MQTT verbonden met %s", self.cfg["host"])
                     async for msg in client.messages:
                         try:
@@ -147,6 +151,9 @@ class MqttBridge:
                 await c.set_power(True)
             return
 
+        if self.nowplaying and topic == self.nowplaying.cfg.get("topic"):
+            await self.nowplaying.handle_mqtt(text)
+            return
         cmd = topic.rsplit("/", 1)[-1]
         w, h = c.layout.width, c.layout.height
         bright = float(self.render_cfg.get("brightness", 0.5))

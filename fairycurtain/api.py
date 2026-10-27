@@ -300,6 +300,33 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
             raise HTTPException(503, str(e))
         return curtain.status()
 
+    # ---- now playing
+    @app.get("/api/nowplaying", dependencies=dep)
+    async def nowplaying_status():
+        np = getattr(app.state, "nowplaying", None)
+        return np.status() if np else {"enabled": False}
+
+    @app.post("/api/nowplaying/enable", dependencies=dep)
+    async def nowplaying_enable(enabled: bool = True):
+        np = getattr(app.state, "nowplaying", None)
+        if not np:
+            raise HTTPException(503, "nowplaying niet geconfigureerd")
+        np.enabled = enabled
+        if not enabled:
+            await curtain.stop_animation()
+        return np.status()
+
+    @app.post("/api/nowplaying/push", dependencies=dep)
+    async def nowplaying_push(body: dict):
+        """Push vanuit een eigen app: {"title":..,"artist":..,"image":url,"playing":true}."""
+        np = getattr(app.state, "nowplaying", None)
+        if not np:
+            raise HTTPException(503, "nowplaying niet geconfigureerd")
+        np.enabled = True
+        await np.update({"title": body.get("title"), "artist": body.get("artist"),
+                         "image": body.get("image"), "playing": body.get("playing", True)})
+        return np.status()
+
     # ---- UI
     @app.get("/", include_in_schema=False)
     async def index():

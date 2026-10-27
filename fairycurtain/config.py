@@ -39,6 +39,13 @@ DEFAULTS = {
         "discovery_prefix": "homeassistant",
         "device_name": "LED-gordijn",
     },
+    "nowplaying": {
+        "enabled": False, "source": "http", "url": None, "interval": 5,
+        "paths": {"title": "title", "artist": "artist", "image": "image"},
+        "show": "cover", "text_seconds": 6, "fit": "cover", "movement": "still",
+        "idle": "keep", "brightness": 1.0,
+        "ha_url": None, "ha_token": None, "entity_id": None, "topic": None,
+    },
     "log_level": "INFO",
 }
 

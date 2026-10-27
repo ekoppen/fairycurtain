@@ -82,6 +82,23 @@ Zet in `config.yaml` `mqtt.enabled: true` met je broker. Via MQTT-discovery vers
 
 Voor automatiseringen zijn er command-topics (`fairycurtain/cmd/text`, `/cmd/image`, `/cmd/frame`, `/cmd/raw`, `/cmd/stop`). Zonder MQTT werkt alles ook met `rest_command`. Beide staan uitgewerkt in `homeassistant/voorbeelden.yaml`.
 
+## Now playing: albumhoes van wat er speelt
+
+Zet in `config.yaml` de sectie `nowplaying` aan. Drie bronnen:
+
+- **http**: de service pollt een JSON-endpoint van je eigen app (RetroHead, HSS, …) en haalt titel/artiest/hoes eruit met paden als `track.cover_url` of `items[0].image`.
+- **homeassistant**: een `media_player`-entity (Spotify, Sonos, …) via de HA-API met een long-lived token; de hoes komt uit `entity_picture`.
+- **mqtt**: JSON-berichten op een topic.
+
+Of laat je app zelf pushen, dan hoeft er niets gepolld te worden:
+
+```bash
+curl -X POST localhost:8321/api/nowplaying/push -H 'Content-Type: application/json' \
+     -d '{"artist":"New Order","title":"Blue Monday","image":"https://…/cover.jpg"}'
+```
+
+`show: both` toont eerst artiest/titel als tekstpagina's en daarna de hoes; `movement: loop_left` laat de hoes schuiven; `idle: off` zet het gordijn uit als er niets speelt. Verwachting: op 20×20 met één tint per pixel wordt een hoes een kleurabstractie, vaak herkenbaar aan de kleurvlakken, niet aan details.
+
 ## Eerste keer: kalibreren
 
 1. Start de service, open de editor, controleer dat de status "verbonden" zegt.

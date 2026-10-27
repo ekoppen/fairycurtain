@@ -40,4 +40,28 @@ mqtt:
   discovery_prefix: homeassistant
   device_name: "LED-gordijn"
 
+nowplaying:                   # albumhoes/artiest tonen zodra het nummer wisselt
+  enabled: false
+  source: http                # http | homeassistant | mqtt
+  # --- http: pollt een JSON-endpoint van je eigen app (RetroHead, HSS, …)
+  url: http://retrohead.local/api/now-playing
+  interval: 5
+  paths:                      # paden in de JSON, bv. "track.cover_url" of "items[0].image"
+    title: title
+    artist: artist
+    image: image
+    playing: null             # optioneel: pad naar "playing"/true
+  # --- homeassistant: een media_player (Spotify, Sonos, …) via de HA-API
+  # ha_url: http://192.168.178.10:8123
+  # ha_token: <long-lived access token>
+  # entity_id: media_player.woonkamer
+  # --- mqtt: JSON-berichten op een topic (vereist mqtt.enabled)
+  # topic: retrohead/nowplaying
+  show: cover                 # cover | text | both (eerst artiest/titel, dan de hoes)
+  text_seconds: 6
+  fit: cover
+  movement: still             # bv. loop_left om de hoes te laten schuiven
+  idle: keep                  # keep | off | clear  als er niets speelt
+  brightness: 1.0
+
 log_level: INFO

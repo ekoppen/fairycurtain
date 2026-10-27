@@ -25,14 +25,18 @@ def build(cfg: dict):
         keepalive_interval=float(dev.get("keepalive_interval", 30)),
     )
     app = create_app(curtain, cfg)
+    from .nowplaying import NowPlaying
+    nowplaying = NowPlaying(curtain, cfg.get("nowplaying", {}), cfg.get("render", {}))
+    app.state.nowplaying = nowplaying
     mqtt = None
     if cfg.get("mqtt", {}).get("enabled"):
         from .mqtt import MqttBridge
-        mqtt = MqttBridge(curtain, cfg["mqtt"], cfg.get("render", {}))
+        mqtt = MqttBridge(curtain, cfg["mqtt"], cfg.get("render", {}), nowplaying=nowplaying)
 
     @app.on_event("startup")
     async def _startup():
         await curtain.start()
+        await nowplaying.start()
         if mqtt:
             await mqtt.start()
 
@@ -40,6 +44,7 @@ def build(cfg: dict):
     async def _shutdown():
         if mqtt:
             await mqtt.stop()
+        await nowplaying.stop()
         await curtain.close()
 
     return app
