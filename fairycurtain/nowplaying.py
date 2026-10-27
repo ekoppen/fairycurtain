@@ -68,6 +68,7 @@ class NowPlaying:
         self._key: Optional[str] = None
         self._task: Optional[asyncio.Task] = None
         self._show_task: Optional[asyncio.Task] = None
+        self._last_err: Optional[str] = None
         self._session = None
 
     # ------------------------------------------------------------ lifecycle
@@ -146,6 +147,7 @@ class NowPlaying:
         if source == "mqtt":
             return  # MQTT-bron wordt gevoed via handle_mqtt() vanuit mqtt.py
         interval = float(self.cfg.get("interval", 5))
+        log.info("Now playing: bron %s, %s", source, self.cfg.get("url") or self.cfg.get("entity_id") or "", )
         while True:
             try:
                 if self.enabled:
@@ -155,7 +157,10 @@ class NowPlaying:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                log.debug("nowplaying: %s", e)
+                msg = f"{type(e).__name__}: {e}"
+                if msg != self._last_err:
+                    log.warning("nowplaying: bron %s niet leesbaar: %s", self.cfg.get("url") or source, msg)
+                    self._last_err = msg
             await asyncio.sleep(interval)
 
     async def handle_mqtt(self, payload: str) -> None:
