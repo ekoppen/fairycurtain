@@ -35,6 +35,7 @@ The album cover in the first screenshot is a generated example image.
 | Connection, state, animations | `fairycurtain/device.py`, `transport.py` |
 | REST API + web admin | `fairycurtain/api.py`, `static/index.html` |
 | Now playing (album art from any source) | `fairycurtain/nowplaying.py` |
+| Built-in gallery (Halloween, Christmas, emoji, …) | `fairycurtain/gallery.py` |
 | Config validation + in-browser config editor | `fairycurtain/config_schema.py` |
 | MQTT + HA discovery | `fairycurtain/mqtt.py` |
 | ESP32 bridge firmware (optional) | `esp32-bridge/fairy_bridge.ino` |
@@ -75,6 +76,7 @@ All endpoints live under `/api` and speak JSON. With `api_key` set, send the hea
 | `POST /image` | multipart upload (PNG/JPG/GIF) | fields `file`, `fit`, `brightness` |
 | `POST /image/base64` | image as base64 | `{"data":"…","fit":"cover"}` |
 | `POST /text` | text in pages | `{"text":"Hi","color":"#00ffff","page_seconds":4,"movement":"loop_left"}` |
+| `GET /gallery`, `POST /gallery/{id}` | list the built-in pictures / show one | |
 | `POST /movement` | move/blink/breathe the picture | `{"direction":"loop_left","speed":40,"brightness":80}` |
 | `POST /animation/stop` | stop animation | |
 | `POST /clear` | all black | |
@@ -91,6 +93,17 @@ curl -X POST localhost:8321/api/text -H 'Content-Type: application/json' \
      -d '{"text":"Welcome!","color":"#ff66cc","speed":14}'
 curl -X POST localhost:8321/api/image -F file=@pumpkin.gif -F brightness=0.4
 ```
+
+## Gallery: ready-made pictures
+
+The Control page has a gallery of 20×20 pixel-art pictures to show with one click, like the official app: **Halloween** (pumpkin, ghost, bat, skull), **Christmas** (tree, snowman), **Love & spring** (heart, Easter egg) and **Emoji** (smiley, sun, star, rainbow). Over the API:
+
+```bash
+curl localhost:8321/api/gallery                       # list: id, title, category, 400 hex colors
+curl -X POST localhost:8321/api/gallery/pumpkin       # show one on the curtain
+```
+
+Pictures are scaled to other layout sizes automatically. To add your own, add a sprite to `fairycurtain/gallery.py` (a few lines of text per picture; see the existing ones), or just draw one in the editor and send it. Remember the curtain shows one hue per pixel, so saturated colors work best.
 
 ## Now playing: album art of what is playing
 

@@ -100,6 +100,12 @@ label.l{display:flex;align-items:center;gap:8px;font-size:14px}
 /* drawing */
 canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:var(--rs);touch-action:none;cursor:crosshair;image-rendering:pixelated}
 .pal{display:flex;gap:6px;flex-wrap:wrap}
+.gcat{font-size:12px;color:var(--mut);font-weight:500;margin:12px 0 6px}
+.gthumbs{display:flex;flex-wrap:wrap;gap:8px}
+.thumb{width:68px;border:1px solid var(--line);border-radius:var(--rs);background:#000;padding:4px;cursor:pointer;color:#cfd3de;font-size:10px;text-align:center}
+.thumb canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated}
+.thumb span{display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thumb:hover{border-color:var(--acc)}
 .pal span{width:26px;height:26px;border-radius:6px;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--rs);overflow:hidden}
 .seg button{border:0;background:var(--panel2);padding:0 14px;height:36px;font-size:14px;cursor:pointer}
@@ -187,6 +193,12 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
 
       <div>
         <div class="panel">
+          <h2>Gallery <small>click to show on the curtain</small></h2>
+          <div id="gallery"></div>
+          <div class="muted" style="margin-top:10px">Want to remix one? Show it, then press "Load from curtain" in the drawing panel.</div>
+        </div>
+
+        <div class="panel" style="margin-top:16px">
           <h2>Text</h2>
           <div class="row">
             <input type="text" id="text" placeholder="e.g. HELLO" style="flex:1;min-width:140px" aria-label="Text">
@@ -346,6 +358,13 @@ $('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return toast(
 $('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return toast('Choose a file first');const fd=new FormData();fd.append('file',f);fd.append('fit',$('#fit').value);
   try{const r=await fetch('/api/image',{method:'POST',body:fd});const j=await r.json();if(!r.ok)throw new Error(j.detail);toast(j.animated?('GIF playing, '+j.frames+' frames'):'Image sent to the curtain');refresh()}catch(e){err(e)}};
 
+/* gallery */
+async function galleryLoad(){try{const g=await api('/gallery');const box=$('#gallery');box.replaceChildren();const cats={};g.items.forEach(it=>(cats[it.category]=cats[it.category]||[]).push(it));
+  for(const [cat,items] of Object.entries(cats)){const h=document.createElement('div');h.className='gcat';h.textContent=cat;const row=document.createElement('div');row.className='gthumbs';
+    items.forEach(it=>{const b=document.createElement('button');b.className='thumb';b.title=it.title;b.setAttribute('aria-label',it.title);const c=document.createElement('canvas');c.width=20;c.height=20;const x=c.getContext('2d');it.hex.forEach((col,i)=>{x.fillStyle=col;x.fillRect(i%20,Math.floor(i/20),1,1)});const s=document.createElement('span');s.textContent=it.title;b.append(c,s);b.onclick=()=>showGallery(it);row.appendChild(b)});
+    box.append(h,row)}}catch(e){}}
+async function showGallery(it){try{if((await api('/status')).master===false)await api('/master',{method:'POST',body:'{"on":true}'});await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/gallery/'+it.id,{method:'POST'});toast(it.title+' sent to the curtain');refresh()}catch(e){err(e)}}
+
 /* text, movement, preset, color */
 $('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,page_seconds:+$('#pageSec').value})}).then(r=>{toast('Text: '+r.frames+' pages');refresh()}).catch(err);
 $('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(()=>toast('Movement applied')).catch(err);
@@ -397,7 +416,7 @@ async function applyLayoutFromCfg(){try{const s=await api('/status');applyLayout
 function applyLayout(l){if(l.width!==W||l.height!==H){W=l.width;H=l.height;initGrid()}}
 async function refresh(){try{const s=await api('/status');st(s)}catch(e){}npLoad();liveLoad()}
 (async()=>{try{const s=await api('/status');applyLayout(s.layout);st(s);const p=await api('/presets');p.presets.forEach(x=>{const o=document.createElement('option');o.value=x.number;o.textContent=x.number+' · '+x.name;$('#preset').appendChild(o)})}catch(e){err(e);initGrid()}
-  if(!grid.length)initGrid();npLoad();liveLoad();setInterval(refresh,3000)})();
+  if(!grid.length)initGrid();npLoad();liveLoad();galleryLoad();setInterval(refresh,3000)})();
 </script>
 </body>
 </html>

@@ -193,3 +193,22 @@ def test_ha_origin_match_is_not_a_string_prefix():
     for bad in ("http://ha.local:8123@evil.example/x", "http://ha.local:81234/x", "http://ha.local:8123.evil.example/x",
                 "https://ha.local:8123/x", "http://evil.example/x"):
         assert not _same_origin(bad, base), bad
+
+
+@pytest.mark.asyncio
+async def test_gallery(setup):
+    from fairycurtain import gallery as G
+    t, c, app = setup
+    await c.start()
+    h = {"X-API-Key": "secret"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        r = await ac.get("/api/gallery", headers=h)
+        items = r.json()["items"]
+        assert {"pumpkin", "tree", "heart", "smiley"} <= {i["id"] for i in items}
+        assert all(len(i["hex"]) == 400 for i in items)
+        r = await ac.post("/api/gallery/pumpkin", headers=h)
+        assert r.status_code == 200 and c.last_grid[1][9] == (0, 200, 0)   # the pumpkin stem is green
+        assert (await ac.post("/api/gallery/nope", headers=h)).status_code == 404
+        # other layout sizes are scaled, not cropped or errored
+        assert len(G.grid("heart", 10, 5)) == 5 and len(G.grid("heart", 10, 5)[0]) == 10
+    await c.close()

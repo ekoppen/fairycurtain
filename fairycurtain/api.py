@@ -19,6 +19,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from . import gallery as GAL
 from . import protocol as P
 from . import render as R
 from .config import save_config, save_layout
@@ -158,6 +159,20 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
 
     def _wh():
         return curtain.layout.width, curtain.layout.height
+
+    # ---- gallery
+    @app.get("/api/gallery", dependencies=dep)
+    async def gallery_list():
+        return {"items": GAL.listing()}
+
+    @app.post("/api/gallery/{item_id}", dependencies=dep)
+    async def gallery_show(item_id: str):
+        w, h = _wh()
+        grid = GAL.grid(item_id, w, h)
+        if grid is None:
+            raise HTTPException(404, "Unknown gallery item")
+        await curtain.show_grid(grid)
+        return {"ok": True, "id": item_id}
 
     # ---- status
     @app.get("/api/status", dependencies=dep)
