@@ -106,6 +106,9 @@ canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:var(--rs);to
 .thumb canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated}
 .thumb span{display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .thumb:hover{border-color:var(--acc)}
+.gitem{position:relative}
+.gdel{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-size:11px;line-height:1;padding:0;cursor:pointer}
+.gdel:hover{color:var(--bad);border-color:var(--bad)}
 .pal span{width:26px;height:26px;border-radius:6px;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--rs);overflow:hidden}
 .seg button{border:0;background:var(--panel2);padding:0 14px;height:36px;font-size:14px;cursor:pointer}
@@ -173,6 +176,7 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
           </div>
           <div class="row">
             <button class="btn primary" id="sendFrame">Send to curtain</button>
+            <button class="btn sm" id="drawSaveBtn">Save to gallery</button>
           </div>
           <div class="muted">The curtain only knows a hue per light, plus white or off; dark colors become off, grayish ones white.</div>
         </div>
@@ -186,8 +190,9 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
             <select id="fit" aria-label="Fit"><option value="cover">fill (crop)</option><option value="contain">fit</option><option value="stretch">stretch</option></select>
             <button class="btn sm" id="imgPreview">Load into editor</button>
             <button class="btn primary" id="imgSend">Send to curtain</button>
+            <button class="btn sm" id="imgSaveBtn">Save to gallery</button>
           </div>
-          <div class="muted">An animated GIF becomes a slideshow (one frame per ~3 s).</div>
+          <div class="muted">An animated GIF becomes a slideshow (one frame per ~3 s). "Save to gallery" keeps the picture under "My pictures" without showing it.</div>
         </div>
       </div>
 
@@ -361,8 +366,14 @@ $('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return toas
 /* gallery */
 async function galleryLoad(){try{const g=await api('/gallery');const box=$('#gallery');box.replaceChildren();const cats={};g.items.forEach(it=>(cats[it.category]=cats[it.category]||[]).push(it));
   for(const [cat,items] of Object.entries(cats)){const h=document.createElement('div');h.className='gcat';h.textContent=cat;const row=document.createElement('div');row.className='gthumbs';
-    items.forEach(it=>{const b=document.createElement('button');b.className='thumb';b.title=it.title;b.setAttribute('aria-label',it.title);const c=document.createElement('canvas');c.width=20;c.height=20;const x=c.getContext('2d');it.hex.forEach((col,i)=>{x.fillStyle=col;x.fillRect(i%20,Math.floor(i/20),1,1)});const s=document.createElement('span');s.textContent=it.title;b.append(c,s);b.onclick=()=>showGallery(it);row.appendChild(b)});
+    items.forEach(it=>{const w=document.createElement('div');w.className='gitem';const b=document.createElement('button');b.className='thumb';b.title=it.title+(it.animated?' (GIF)':'');b.setAttribute('aria-label',it.title);const c=document.createElement('canvas');c.width=20;c.height=20;const x=c.getContext('2d');it.hex.forEach((col,i)=>{x.fillStyle=col;x.fillRect(i%20,Math.floor(i/20),1,1)});const s=document.createElement('span');s.textContent=it.title;b.append(c,s);b.onclick=()=>showGallery(it);w.appendChild(b);
+      if(it.user){const d=document.createElement('button');d.className='gdel';d.textContent='✕';d.title='Delete from gallery';d.setAttribute('aria-label','Delete '+it.title);d.onclick=async()=>{if(!confirm('Delete "'+it.title+'" from the gallery?'))return;try{await api('/gallery/'+it.id,{method:'DELETE'});toast('Deleted');galleryLoad()}catch(e){err(e)}};w.appendChild(d)}
+      row.appendChild(w)});
     box.append(h,row)}}catch(e){}}
+async function saveToGallery(blob,filename,fit){const name=prompt('Name for the gallery',filename.replace(/\.[^.]+$/,'').slice(0,40));if(name===null)return;const fd=new FormData();fd.append('file',blob,filename);fd.append('title',name);fd.append('fit',fit);
+  try{const r=await fetch('/api/gallery',{method:'POST',body:fd});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(typeof j.detail==='string'?j.detail:r.status);toast('Saved to gallery');galleryLoad()}catch(e){err(e)}}
+$('#imgSaveBtn').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return toast('Choose a file first');saveToGallery(f,f.name,$('#fit').value)};
+$('#drawSaveBtn').onclick=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');grid.forEach((row,y)=>row.forEach((col,i)=>{x.fillStyle=col;x.fillRect(i,y,1,1)}));c.toBlob(b=>saveToGallery(b,'drawing.png','cover'),'image/png')};
 async function showGallery(it){try{if((await api('/status')).master===false)await api('/master',{method:'POST',body:'{"on":true}'});await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/gallery/'+it.id,{method:'POST'});toast(it.title+' sent to the curtain');refresh()}catch(e){err(e)}}
 
 /* text, movement, preset, color */

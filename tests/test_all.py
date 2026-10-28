@@ -213,3 +213,42 @@ async def test_gallery(setup):
         # other layout sizes are scaled, not cropped or errored
         assert len(G.grid("heart", 10, 5)) == 5 and len(G.grid("heart", 10, 5)[0]) == 10
     await c.close()
+
+
+@pytest.mark.asyncio
+async def test_user_gallery(tmp_path):
+    from fairycurtain.gallery import UserGallery
+    c = FairyCurtain(FakeTransport(), Layout(), packet_delay=0.0, max_fps=100, keepalive_interval=0)
+    gdir = tmp_path / "g"
+    app = create_app(c, {**DEFAULTS, "api": {"api_key": "secret"}, "render": {"brightness": 1.0}, "gallery": {"dir": str(gdir)}})
+    await c.start()
+    h = {"X-API-Key": "secret"}
+
+    def png(color=(0, 0, 255), size=(8, 8)):
+        b = io.BytesIO(); Image.new("RGB", size, color).save(b, "PNG"); return b.getvalue()
+    gif = io.BytesIO()
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(gif, "GIF", save_all=True, append_images=[Image.new("RGB", (8, 8), (0, 255, 0))], duration=100)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        r = await ac.post("/api/gallery", files={"file": ("a.png", png(), "image/png")}, data={"title": "  Blue \n <b>x</b> "}, headers=h)
+        item = r.json()
+        assert r.status_code == 200 and item["id"].startswith("u_") and item["title"] == "Blue <b>x</b>" and item["user"]
+        r = await ac.post("/api/gallery", files={"file": ("b.gif", gif.getvalue(), "image/gif")}, headers=h)
+        assert r.json()["animated"] is True and r.json()["title"] == "b"           # title defaults to the file name
+        items = (await ac.get("/api/gallery", headers=h)).json()["items"]
+        assert [i["user"] for i in items[:2]] == [True, True] and any(i["id"] == "pumpkin" for i in items)
+        assert (await ac.post(f"/api/gallery/{item['id']}", headers=h)).status_code == 200
+        assert c.last_grid[0][0] == (0, 0, 255)
+        assert (gdir / "index.json").exists() and UserGallery(gdir).get(item["id"]) is not None   # survives a restart
+        # rejected input
+        bmp = io.BytesIO(); Image.new("RGB", (4, 4)).save(bmp, "BMP")
+        assert (await ac.post("/api/gallery", files={"file": ("c.bmp", bmp.getvalue(), "image/bmp")}, headers=h)).status_code == 400
+        assert (await ac.post("/api/gallery", files={"file": ("d.png", png(size=(R.MAX_IMAGE_DIMENSION + 1, 1)), "image/png")}, headers=h)).status_code == 400
+        assert (await ac.post("/api/gallery", files={"file": ("e.txt", b"not an image", "text/plain")}, headers=h)).status_code == 400
+        # delete: own items only
+        assert (await ac.delete("/api/gallery/pumpkin", headers=h)).status_code == 404
+        assert (await ac.delete("/api/gallery/u_../../x", headers=h)).status_code == 404
+        assert (await ac.delete(f"/api/gallery/{item['id']}", headers=h)).status_code == 200
+        assert UserGallery(gdir).get(item["id"]) is None and not list(gdir.glob(item["id"] + ".*"))
+        assert (await ac.post(f"/api/gallery/{item['id']}", headers=h)).status_code == 404
+    await c.close()

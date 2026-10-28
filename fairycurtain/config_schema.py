@@ -157,7 +157,7 @@ def validate(cfg: dict) -> dict:
         out[section] = {}
         for fname, fspec in sspec["fields"].items():
             out[section][fname] = _check(fspec, src.get(fname), f"{section}.{fname}", errors)
-    # kruisregels
+    # cross-field rules
     dev = out.get("device", {})
     if dev.get("transport") == "esp32" and not dev.get("bridge_url"):
         errors["device.bridge_url"] = "required for transport esp32"

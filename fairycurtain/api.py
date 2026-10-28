@@ -168,18 +168,46 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         return curtain.layout.width, curtain.layout.height
 
     # ---- gallery
+    gallery_dir = (cfg.get("gallery") or {}).get("dir") or Path(cfg.get("_path") or "config.yaml").resolve().parent / "gallery"
+    user_gallery = GAL.UserGallery(gallery_dir)
+
     @app.get("/api/gallery", dependencies=dep)
     async def gallery_list():
-        return {"items": GAL.listing()}
+        return {"items": user_gallery.listing() + GAL.listing()}
+
+    @app.post("/api/gallery", dependencies=dep)
+    async def gallery_add(file: UploadFile = File(...), title: str = Form(""), fit: str = Form("cover")):
+        """Save an uploaded image/GIF to 'My pictures' (does not show it)."""
+        data = await file.read(R.MAX_IMAGE_BYTES + 1)
+        if len(data) > R.MAX_IMAGE_BYTES:
+            raise HTTPException(413, "Image too large")
+        try:
+            return user_gallery.add(title or Path(file.filename or "").stem, data, fit)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except OSError as e:
+            log.warning("Gallery storage not writable: %s", e)
+            raise HTTPException(500, "Gallery storage is not writable (check the gallery directory)")
 
     @app.post("/api/gallery/{item_id}", dependencies=dep)
     async def gallery_show(item_id: str):
         w, h = _wh()
         grid = GAL.grid(item_id, w, h)
-        if grid is None:
+        if grid is not None:
+            await curtain.show_grid(grid)
+            return {"ok": True, "id": item_id}
+        found = user_gallery.get(item_id)
+        if found is None:
             raise HTTPException(404, "Unknown gallery item")
-        await curtain.show_grid(grid)
+        item, data = found
+        await _show_image_bytes(data, item.get("fit", "cover"), None, True, item["title"])
         return {"ok": True, "id": item_id}
+
+    @app.delete("/api/gallery/{item_id}", dependencies=dep)
+    async def gallery_delete(item_id: str):
+        if not user_gallery.delete(item_id):
+            raise HTTPException(404, "Unknown gallery item (built-in pictures cannot be deleted)")
+        return {"ok": True}
 
     # ---- status
     @app.get("/api/status", dependencies=dep)

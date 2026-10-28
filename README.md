@@ -88,7 +88,7 @@ All endpoints live under `/api` and speak JSON. With `api_key` set, send the hea
 | `POST /image` | multipart upload (PNG/JPG/GIF) | fields `file`, `fit`, `brightness` |
 | `POST /image/base64` | image as base64 | `{"data":"…","fit":"cover"}` |
 | `POST /text` | text in pages | `{"text":"Hi","color":"#00ffff","page_seconds":4,"movement":"loop_left"}` |
-| `GET /gallery`, `POST /gallery/{id}` | list the built-in pictures / show one | |
+| `GET /gallery`, `POST /gallery/{id}`, `POST /gallery`, `DELETE /gallery/{id}` | list pictures / show one / save an upload (`file`, `title`, `fit`) / delete one of yours | |
 | `POST /movement` | move/blink/breathe the picture | `{"direction":"loop_left","speed":40,"brightness":80}` |
 | `POST /animation/stop` | stop animation | |
 | `POST /clear` | all black | |
@@ -115,7 +115,17 @@ curl localhost:8321/api/gallery                       # list: id, title, categor
 curl -X POST localhost:8321/api/gallery/pumpkin       # show one on the curtain
 ```
 
-Pictures are scaled to other layout sizes automatically. To add your own, add a sprite to `fairycurtain/gallery.py` (a few lines of text per picture; see the existing ones), or just draw one in the editor and send it. Remember the curtain shows one hue per pixel, so saturated colors work best.
+Pictures are scaled to other layout sizes automatically. Remember the curtain shows one hue per pixel, so saturated colors work best.
+
+**Your own pictures.** Press **Save to gallery** next to an uploaded image/GIF or your drawing in the editor, give it a name, and it shows up under **My pictures** (✕ deletes it). Saving is optional and does not show the picture. Over the API:
+
+```bash
+curl -X POST localhost:8321/api/gallery -F file=@my.gif -F title="My GIF" -F fit=cover   # save
+curl -X POST localhost:8321/api/gallery/u_0123456789ab                                     # show (id from GET /api/gallery)
+curl -X DELETE localhost:8321/api/gallery/u_0123456789ab                                   # delete
+```
+
+Saved pictures live in a `gallery/` folder next to `config.yaml` (the Docker compose file mounts `./gallery`); change it with `gallery.dir`. Only PNG, JPEG, GIF and WEBP are accepted (max 5 MB, 2048 px per side, 200 pictures). To add built-in pictures for everyone, add a sprite to `fairycurtain/gallery.py`.
 
 ## Now playing: album art of what is playing
 

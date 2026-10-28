@@ -4,5 +4,6 @@ __pycache__/
 *.egg-info/
 .venv/
 config.yaml
+gallery/
 *.log
 .DS_Store

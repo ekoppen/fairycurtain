@@ -7,7 +7,13 @@ mirrored. Other layout sizes are rendered by scaling with nearest-neighbour.
 """
 from __future__ import annotations
 
+import json
 import math
+import os
+import re
+import time
+import uuid
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from PIL import Image
@@ -131,3 +137,95 @@ def grid(gid: str, width: int = SIZE, height: int = SIZE) -> Optional[Grid]:
     img = Image.new("RGB", (SIZE, SIZE))
     img.putdata([PALETTE[c] for r in it["rows"] for c in r])
     return R.image_to_grid(img, width, height, fit="contain", resample=Image.NEAREST)
+
+
+# ----------------------------------------------------------- user pictures ----
+
+USER_CATEGORY = "My pictures"
+MAX_USER_ITEMS = 200
+MAX_TITLE_CHARS = 40
+USER_ID_RE = re.compile(r"^u_[0-9a-f]{12}$")
+# Only common formats are stored; Pillow can open far more exotic ones.
+ALLOWED_FORMATS = {"PNG": "png", "JPEG": "jpg", "GIF": "gif", "WEBP": "webp"}
+FITS = ("cover", "contain", "stretch")
+
+
+def clean_title(title: str) -> str:
+    t = re.sub(r"\s+", " ", "".join(ch for ch in (title or "") if ch.isprintable())).strip()
+    return t[:MAX_TITLE_CHARS] or "Untitled"
+
+
+class UserGallery:
+    """Pictures and GIFs saved by the user: files in a directory plus an index.json with
+    title, fit and a 20x20 thumbnail, so listing never has to decode images."""
+
+    def __init__(self, directory) -> None:
+        self.dir = Path(directory)
+        self.index_path = self.dir / "index.json"
+
+    def _load(self) -> Dict[str, dict]:
+        try:
+            data = json.loads(self.index_path.read_text())
+            return data if isinstance(data, dict) else {}
+        except (FileNotFoundError, ValueError):
+            return {}
+
+    def _save(self, index: Dict[str, dict]) -> None:
+        self.dir.mkdir(parents=True, exist_ok=True)
+        tmp = self.index_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(index))
+        os.replace(tmp, self.index_path)
+
+    @staticmethod
+    def _public(gid: str, it: dict) -> dict:
+        return {"id": gid, "title": it["title"], "category": USER_CATEGORY, "hex": it["thumb"],
+                "user": True, "animated": bool(it.get("animated"))}
+
+    def listing(self) -> List[dict]:
+        idx = self._load()
+        return [self._public(g, it) for g, it in sorted(idx.items(), key=lambda kv: -kv[1].get("created", 0))]
+
+    def add(self, title: str, data: bytes, fit: str = "cover") -> dict:
+        """Validate and store. Raises ValueError for bad input, OSError if the directory is not writable."""
+        fit = fit if fit in FITS else "cover"
+        try:  # decoding problems are the caller's fault (ValueError), unlike write errors (OSError)
+            img = R.bytes_to_image(data)  # also enforces the dimension limit
+            if img.format not in ALLOWED_FORMATS:
+                raise ValueError("Only PNG, JPEG, GIF and WEBP images can be saved")
+            animated = bool(getattr(img, "is_animated", False))
+            img.seek(0)
+            thumb = [_hex(px) for row in R.image_to_grid(img.convert("RGB"), SIZE, SIZE, fit=fit) for px in row]
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"Not a valid image: {e}")
+        idx = self._load()
+        if len(idx) >= MAX_USER_ITEMS:
+            raise ValueError(f"The gallery is full ({MAX_USER_ITEMS} pictures); delete some first")
+        gid = "u_" + uuid.uuid4().hex[:12]
+        fname = f"{gid}.{ALLOWED_FORMATS[img.format]}"
+        self.dir.mkdir(parents=True, exist_ok=True)
+        (self.dir / fname).write_bytes(data)
+        idx[gid] = {"title": clean_title(title), "file": fname, "fit": fit, "animated": animated,
+                    "thumb": thumb, "created": time.time()}
+        self._save(idx)
+        return self._public(gid, idx[gid])
+
+    def get(self, gid: str):
+        """(item, bytes) or None. Only ids we generated are accepted, so no path tricks."""
+        it = self._load().get(gid) if USER_ID_RE.match(gid or "") else None
+        if not it:
+            return None
+        try:
+            return it, (self.dir / it["file"]).read_bytes()
+        except FileNotFoundError:
+            return None
+
+    def delete(self, gid: str) -> bool:
+        idx = self._load()
+        it = idx.pop(gid, None) if USER_ID_RE.match(gid or "") else None
+        if not it:
+            return False
+        (self.dir / it["file"]).unlink(missing_ok=True)
+        self._save(idx)
+        return True

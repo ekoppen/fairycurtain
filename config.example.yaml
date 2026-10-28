@@ -65,4 +65,7 @@ nowplaying:                   # show album art/artist whenever the track changes
   idle: keep                  # keep | off | clear  when nothing is playing
   brightness: 1.0
 
+gallery:
+  dir: null                   # where "Save to gallery" keeps pictures; null = gallery/ next to config.yaml
+
 log_level: INFO

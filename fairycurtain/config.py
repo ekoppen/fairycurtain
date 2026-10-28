@@ -47,6 +47,7 @@ DEFAULTS = {
         "idle": "keep", "brightness": 1.0,
         "ha_url": None, "ha_token": None, "entity_id": None, "topic": None,
     },
+    "gallery": {"dir": None},          # where saved pictures live; None = "gallery/" next to config.yaml
     "log_level": "INFO",
 }
 

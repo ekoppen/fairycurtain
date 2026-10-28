@@ -10,6 +10,7 @@ services:
       - "8321:8321"
     volumes:
       - ./config.yaml:/config/config.yaml
+      - ./gallery:/config/gallery       # pictures saved to the gallery
     # environment:
     #   FAIRY_API_KEY: change-me
 
