@@ -183,3 +183,13 @@ async def test_fetch_image_refuses_bad_urls():
     for url in ("http://127.0.0.1/x.png", "http://169.254.169.254/latest", "file:///etc/passwd"):
         with pytest.raises(ValueError):
             await fetch_image(url)
+
+
+def test_ha_origin_match_is_not_a_string_prefix():
+    from fairycurtain.nowplaying import _same_origin
+    base = "http://ha.local:8123"
+    assert _same_origin("http://ha.local:8123/api/media_player_proxy/x", base)
+    assert _same_origin("HTTP://HA.LOCAL:8123/x", base)
+    for bad in ("http://ha.local:8123@evil.example/x", "http://ha.local:81234/x", "http://ha.local:8123.evil.example/x",
+                "https://ha.local:8123/x", "http://evil.example/x"):
+        assert not _same_origin(bad, base), bad

@@ -34,7 +34,7 @@ import json
 import logging
 import re
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from . import render as R
 from .device import FairyCurtain
@@ -57,6 +57,13 @@ def jpath(obj: Any, path: str) -> Any:
         except (KeyError, IndexError, TypeError):
             return None
     return cur
+
+
+def _same_origin(url: str, base: str) -> bool:
+    """True only if url is on exactly the same scheme/host/port as base (no userinfo tricks)."""
+    u, b = urlsplit(url), urlsplit(base)
+    norm = lambda p: (p.scheme, (p.hostname or "").lower().rstrip("."), p.port or {"http": 80, "https": 443}.get(p.scheme))
+    return bool(b.hostname) and norm(u) == norm(b) and not u.username and not u.password
 
 
 class NowPlaying:
@@ -139,7 +146,7 @@ class NowPlaying:
             return data
         headers = {}
         trusted = False
-        if self.cfg.get("source") == "homeassistant" and url.startswith(self.cfg["ha_url"].rstrip("/")):
+        if self.cfg.get("source") == "homeassistant" and _same_origin(url, self.cfg["ha_url"]):
             headers["Authorization"] = f"Bearer {self.cfg['ha_token']}"
             trusted = True  # the admin's own HA instance (may be on loopback); other URLs are guarded
         return await fetch_image(url, headers, trusted=trusted)
