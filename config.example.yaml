@@ -29,7 +29,7 @@ api:
   host: 127.0.0.1             # loopback only; use 0.0.0.0 to expose on the network (then set api_key!)
   port: 8321
   api_key: null               # set a secret and send it in the X-API-Key header
-  allowed_hosts: []           # without api_key, public domain names are refused as Host (anti DNS rebinding); IPs, "lan01" and *.local are fine; add others here
+  allowed_hosts: []           # without api_key, public domain names are refused as Host (anti DNS rebinding); IPs, "lan01", *.local and *.home.arpa are fine; add others (e.g. "nas.lan") here
 
 mqtt:
   enabled: false

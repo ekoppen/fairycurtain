@@ -163,7 +163,7 @@ async def test_input_guards(setup):
 async def test_host_allowlist_without_key():
     c = FairyCurtain(FakeTransport(), Layout(), keepalive_interval=0)
     app = create_app(c, {**DEFAULTS, "api": {"api_key": None, "allowed_hosts": ["pi.local"]}, "render": {}})
-    for host, code in (("evil.example", 403), ("evil.example.lan.evil.com", 403), ("pi.local:8321", 200), ("lan01:8321", 200),
+    for host, code in (("evil.example", 403), ("evil.example.lan.evil.com", 403), ("nas.lan", 403), ("pi.local:8321", 200), ("lan01:8321", 200),
                        ("nas.home.arpa", 200), ("192.168.1.5:8321", 200), ("localhost", 200), ("my.pi.example.org", 403)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url=f"http://{host}") as ac:
             assert (await ac.get("/health")).status_code == code, host
