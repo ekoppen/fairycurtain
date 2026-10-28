@@ -61,9 +61,12 @@ def jpath(obj: Any, path: str) -> Any:
 
 def _same_origin(url: str, base: str) -> bool:
     """True only if url is on exactly the same scheme/host/port as base (no userinfo tricks)."""
-    u, b = urlsplit(url), urlsplit(base)
-    norm = lambda p: (p.scheme, (p.hostname or "").lower().rstrip("."), p.port or {"http": 80, "https": 443}.get(p.scheme))
-    return bool(b.hostname) and norm(u) == norm(b) and not u.username and not u.password
+    try:
+        u, b = urlsplit(url), urlsplit(base)
+        norm = lambda p: (p.scheme, (p.hostname or "").lower().rstrip("."), p.port or {"http": 80, "https": 443}.get(p.scheme))
+        return bool(b.hostname) and norm(u) == norm(b) and not u.username and not u.password
+    except ValueError:  # e.g. port out of range
+        return False
 
 
 class NowPlaying:
