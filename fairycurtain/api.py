@@ -115,6 +115,9 @@ class LayoutIn(BaseModel):
     save: bool = True
 
 
+LOCAL_SUFFIXES = (".local", ".lan", ".home.arpa")
+
+
 # ------------------------------------------------------------ factory ----
 
 def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
@@ -134,7 +137,11 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         name = urlsplit("//" + host_header).hostname or ""
         if name in allowed_hosts:
             return True
-        try:  # IP literals can't be DNS-rebound; hostnames can
+        # Rebinding needs an attacker-owned public domain (it has dots). Single-label names
+        # ("lan01") and reserved local suffixes can't be registered by an attacker.
+        if name and ("." not in name or name.endswith(LOCAL_SUFFIXES)):
+            return True
+        try:  # IP literals can't be DNS-rebound; public hostnames can
             ipaddress.ip_address(name)
             return True
         except ValueError:

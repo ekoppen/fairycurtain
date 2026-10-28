@@ -54,6 +54,18 @@ Open `http://<host>:8321` for the admin page, `http://<host>:8321/docs` for the 
 
 **Important:** the curtain accepts only one Bluetooth connection. Close the Hello Fairy app on your phone (or turn Bluetooth off there) before starting the service.
 
+## Hardware
+
+Developed and tested with:
+
+| Part | Details |
+|---|---|
+| LED curtain | "Smart LED Curtain Lights": 20 strings × 20 LEDs = **400 LEDs, 2 × 2 m**, indoor use, with IR remote. Controlled by the Hello Fairy app over Bluetooth LE (controller KR-026, BLE name `Hello Fairy-…`). The curtain reports its own size (20×20). |
+| Bridge | **ESP32-C3 Super Mini** running `esp32-bridge/fairy_bridge.ino` (transport `esp32`). Other ESP32 boards with Bluetooth (classic ESP32, S3, C6) should work; ESP32-S2 and ESP8266 have no Bluetooth. |
+| Server | A Linux machine running the service in Docker. Python 3.10+ if you run it without Docker. |
+
+Other curtains that use the same Hello Fairy app and protocol will probably work, but other sizes and controllers are untested. The grid size and wiring order are configurable (see calibration below).
+
 ## Where does it run? Two options
 
 **A. Direct (transport: `bleak`)** — the service runs on a machine with a Bluetooth adapter, within roughly 5–8 m of the curtain. On Proxmox: pass a USB BT dongle through to the LXC/VM running Docker (`network_mode: host` + D-Bus, see `docker-compose.yml`). Or use a Raspberry Pi.
@@ -171,7 +183,7 @@ pytest
 
 ## Security note
 
-By default the API listens on `127.0.0.1` only. The Docker image binds `0.0.0.0` (so the published port works); there, and whenever you set `api.host: 0.0.0.0`, also set `api.api_key` (or `FAIRY_API_KEY`) — a warning is logged otherwise. Do not expose port 8321 to the internet, preferably put it behind a reverse proxy with TLS. Without an `api_key`, requests whose `Host` is a name other than `localhost` or an entry in `api.allowed_hosts` are refused (DNS-rebinding protection; plain IP access works), and cross-origin write requests from browsers are refused. Image URLs fetched by the service (MQTT `cmd/image`, now playing covers) are limited to http(s), non-loopback/link-local hosts, 5 MB and 10 s. Anyone who can publish to your MQTT broker can control the curtain, so secure the broker. `config.yaml` may contain tokens (HA token, MQTT password, API key); it is git-ignored, and the config editor masks secrets.
+By default the API listens on `127.0.0.1` only. The Docker image binds `0.0.0.0` (so the published port works); there, and whenever you set `api.host: 0.0.0.0`, also set `api.api_key` (or `FAIRY_API_KEY`) — a warning is logged otherwise. Do not expose port 8321 to the internet, preferably put it behind a reverse proxy with TLS. Without an `api_key`, requests whose `Host` is a public domain name (one with dots that is not `.local`/`.lan`/`.home.arpa`) are refused unless listed in `api.allowed_hosts` (DNS-rebinding protection; IP addresses, `localhost`, single-label names like `lan01` and `*.local` work out of the box), and cross-origin write requests from browsers are refused. Image URLs fetched by the service (MQTT `cmd/image`, now playing covers) are limited to http(s), non-loopback/link-local hosts, 5 MB and 10 s. Anyone who can publish to your MQTT broker can control the curtain, so secure the broker. `config.yaml` may contain tokens (HA token, MQTT password, API key); it is git-ignored, and the config editor masks secrets.
 
 ## License
 
