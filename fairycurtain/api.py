@@ -1,18 +1,21 @@
 """
-REST-API (FastAPI) + webeditor.
+REST API (FastAPI) + web editor.
 
-Alle endpoints zitten onder /api. Optioneel beveiligd met header `X-API-Key`.
-Interactieve documentatie: http://host:8321/docs
+All endpoints live under /api. Optionally protected with the `X-API-Key` header.
+Interactive documentation: http://host:8321/docs
 """
 from __future__ import annotations
 
 import asyncio
 import base64
+import hmac
+import ipaddress
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Literal, Optional
+from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -27,7 +30,7 @@ log = logging.getLogger("fairycurtain.api")
 STATIC = Path(__file__).parent / "static"
 
 
-# ----------------------------------------------------------- modellen ----
+# ------------------------------------------------------------- models ----
 
 class PowerIn(BaseModel):
     on: bool
@@ -44,7 +47,7 @@ class ColorIn(BaseModel):
         if self.hex:
             return R.hex_to_rgb(self.hex)
         if None in (self.r, self.g, self.b):
-            raise HTTPException(400, "Geef r,g,b of hex")
+            raise HTTPException(400, "Provide r,g,b or hex")
         return (self.r, self.g, self.b)
 
 
@@ -58,34 +61,34 @@ class PresetIn(BaseModel):
 
 
 class FrameIn(BaseModel):
-    """pixels: rijen van rijen [r,g,b]  (grid[y][x]) of platte lijst van hex-kleuren."""
+    """pixels: rows of [r,g,b] (grid[y][x]), or a flat list of hex colors."""
     pixels: Optional[List[List[List[int]]]] = None
-    hex: Optional[List[str]] = None       # width*height items, rij voor rij
+    hex: Optional[List[str]] = None       # width*height items, row by row
     brightness: Optional[float] = Field(None, ge=0, le=1)
 
 
 class TextIn(BaseModel):
-    text: str
+    text: str = Field(..., max_length=R.MAX_TEXT_CHARS)
     color: str = "#ffffff"
     background: str = "#000000"
-    mode: str = Field("pages", description="pages (standaard, ~3 tekens per pagina) | scroll (traag: ~2,5 s per stap)")
+    mode: str = Field("pages", description="pages (default, ~3 characters per page) | scroll (slow: ~2.5 s per step)")
     page_seconds: float = Field(4.0, gt=0)
     scroll: Optional[bool] = None          # legacy: True == mode scroll
-    speed: float = Field(12.0, gt=0, description="alleen bij scroll: pixels per stap-interval")
+    speed: float = Field(12.0, gt=0, description="scroll only: pixels per step interval")
     loop: bool = True
     brightness: Optional[float] = Field(None, ge=0, le=1)
-    font_size: Optional[int] = None
-    movement: Optional[str] = Field(None, description="beweging door het gordijn zelf, bv. loop_left, blink, breathe")
+    font_size: Optional[int] = Field(None, ge=R.MIN_FONT_SIZE, le=R.MAX_FONT_SIZE)
+    movement: Optional[str] = Field(None, description="movement performed by the curtain itself, e.g. loop_left, blink, breathe")
 
 
 class MovementIn(BaseModel):
-    direction: str | int = Field("still", description=f"één van {list(P.DIRECTIONS)} of 0-10")
+    direction: str | int = Field("still", description=f"one of {list(P.DIRECTIONS)} or 0-10")
     brightness: Optional[int] = Field(None, ge=0, le=100)
     speed: Optional[int] = Field(None, ge=0, le=100)
 
 
 class ImageB64In(BaseModel):
-    data: str                              # base64 (met of zonder data:-prefix)
+    data: str                              # base64 (with or without data: prefix)
     fit: str = "cover"
     brightness: Optional[float] = Field(None, ge=0, le=1)
     loop: bool = True
@@ -103,26 +106,51 @@ class TestPixelIn(BaseModel):
 class LayoutIn(BaseModel):
     width: int = Field(20, ge=1, le=256)
     height: int = Field(20, ge=1, le=256)
-    order: str = "column"
+    order: Literal["column", "row"] = "column"
     serpentine: bool = False
     flip_x: bool = False
     flip_y: bool = False
-    pixel_count: Optional[int] = None
+    pixel_count: Optional[int] = Field(None, ge=1, le=65536)
     save: bool = True
 
 
-# ------------------------------------------------------------ fabriek ----
+# ------------------------------------------------------------ factory ----
 
 def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
-    app = FastAPI(title="FairyCurtain", version="1.0", description="Hello Fairy LED-gordijn API")
+    app = FastAPI(title="FairyCurtain", version="1.0", description="Hello Fairy LED curtain API")
     render_cfg = cfg.get("render", {})
     api_key = (cfg.get("api") or {}).get("api_key")
 
     async def auth(x_api_key: Optional[str] = Header(None), key: Optional[str] = None):
-        if api_key and x_api_key != api_key and key != api_key:
-            raise HTTPException(401, "Ongeldige API-key")
+        if api_key and not any(k and hmac.compare_digest(k.encode(), api_key.encode()) for k in (x_api_key, key)):
+            raise HTTPException(401, "Invalid API key")
 
     dep = [Depends(auth)]
+
+    allowed_hosts = {"localhost", *(h.lower() for h in (cfg.get("api") or {}).get("allowed_hosts") or [])}
+
+    def _host_ok(host_header: str) -> bool:
+        name = urlsplit("//" + host_header).hostname or ""
+        if name in allowed_hosts:
+            return True
+        try:  # IP literals can't be DNS-rebound; hostnames can
+            ipaddress.ip_address(name)
+            return True
+        except ValueError:
+            return False
+
+    @app.middleware("http")
+    async def browser_guard(request: Request, call_next):
+        # Without an API key, browsers are the attack path (CSRF / DNS rebinding):
+        # refuse unknown Host names and cross-origin writes. With a key, the header is the guard.
+        if not api_key and not _host_ok(request.headers.get("host", "")):
+            return JSONResponse({"detail": "Host not allowed; add it to api.allowed_hosts or set api_key"},
+                                status_code=403)
+        origin = request.headers.get("origin")
+        if request.method not in ("GET", "HEAD", "OPTIONS") and origin and \
+                urlsplit(origin).netloc != request.headers.get("host"):
+            return JSONResponse({"detail": "Cross-origin request refused"}, status_code=403)
+        return await call_next(request)
     W, H = curtain.layout.width, curtain.layout.height
 
     def _bright(v: Optional[float]) -> float:
@@ -140,16 +168,16 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
     async def presets():
         return {"presets": [{"number": n, "name": P.PRESETS.get(n, f"Preset {n}")} for n in range(1, 59)]}
 
-    # ---- basisbediening
+    # ---- basic controls
     @app.post("/api/power", dependencies=dep)
     async def power(body: PowerIn):
-        """Gordijn aan/uit zonder de hoofdschakelaar te veranderen (bijv. vanuit HA)."""
+        """Curtain on/off without changing the master switch (e.g. from HA)."""
         await curtain.set_power(body.on)
         return curtain.status()
 
     @app.post("/api/master", dependencies=dep)
     async def master(body: PowerIn):
-        """Hoofdschakelaar: uit = alles uit en now playing gepauzeerd; aan = hervatten."""
+        """Master switch: off = everything off and now playing paused; on = resume."""
         await curtain.set_master(body.on)
         return curtain.status()
 
@@ -178,7 +206,7 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         elif body.hex and len(body.hex) >= w * h:
             grid = [[R.hex_to_rgb(body.hex[y * w + x]) for x in range(w)] for y in range(h)]
         else:
-            raise HTTPException(400, f"Geef 'pixels' (rijen) of 'hex' met {w*h} kleuren")
+            raise HTTPException(400, f"Provide 'pixels' (rows) or 'hex' with {w*h} colors")
         if body.brightness is not None:
             f = body.brightness
             grid = [[tuple(int(c * f) for c in px) for px in row] for row in grid]
@@ -188,21 +216,25 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
     @app.post("/api/image", dependencies=dep)
     async def image(file: UploadFile = File(...), fit: str = Form("cover"),
                     brightness: Optional[float] = Form(None), loop: bool = Form(True)):
-        data = await file.read()
-        return await _show_image_bytes(data, fit, brightness, loop, file.filename or "image")
+        data = await file.read(R.MAX_IMAGE_BYTES + 1)
+        return await _show_image_bytes(data, fit, brightness, loop, (file.filename or "image")[:64])
 
     @app.post("/api/image/base64", dependencies=dep)
     async def image_b64(body: ImageB64In):
         s = body.data.split(",", 1)[-1]
+        if len(s) > R.MAX_IMAGE_BYTES * 4 // 3 + 4:
+            raise HTTPException(413, "Image too large")
         return await _show_image_bytes(base64.b64decode(s), body.fit, body.brightness, body.loop, "image")
 
     async def _show_image_bytes(data: bytes, fit: str, brightness: Optional[float], loop: bool, name: str):
+        if len(data) > R.MAX_IMAGE_BYTES:
+            raise HTTPException(413, "Image too large")
         w, h = _wh()
         kw = dict(fit=fit, brightness=_bright(brightness), gamma=float(render_cfg.get("gamma", 1.0)))
         try:
             img = R.bytes_to_image(data)
         except Exception as e:
-            raise HTTPException(400, f"Geen geldige afbeelding: {e}")
+            raise HTTPException(400, f"Not a valid image: {e}")
         if getattr(img, "is_animated", False):
             frames = R.gif_bytes_to_frames(data, w, h, **kw)
             await curtain.play(frames, loop=loop, name=name)
@@ -231,11 +263,11 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
 
     @app.post("/api/movement", dependencies=dep)
     async def movement(body: MovementIn):
-        """Laat het gordijn het huidige plaatje bewegen/knipperen/ademen (geen nieuwe upload nodig)."""
+        """Make the curtain move/blink/breathe the current picture (no new upload needed)."""
         try:
             await curtain.set_movement(body.direction, body.brightness, body.speed)
         except KeyError:
-            raise HTTPException(400, f"Onbekende richting; keuze uit {list(P.DIRECTIONS)} of 0-10")
+            raise HTTPException(400, f"Unknown direction; choose from {list(P.DIRECTIONS)} or 0-10")
         return curtain.state["movement"]
 
     @app.post("/api/animation/stop", dependencies=dep)
@@ -249,7 +281,7 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         return {"ok": True}
 
     def _quantized(grid):
-        """Zoals het gordijn het toont: per pixel tint / wit / uit."""
+        """As the curtain shows it: per pixel hue / white / off."""
         return [[P.pixel_byte_to_rgb(P.rgb_to_pixel_byte(*px)) for px in row] for row in grid]
 
     @app.get("/api/frame/preview.png", dependencies=dep)
@@ -260,14 +292,14 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
 
     @app.get("/api/frame", dependencies=dep)
     async def current_frame(raw: bool = False):
-        """Laatst verstuurde frame als hex-lijst (rij voor rij), zoals /api/frame het aanneemt."""
+        """Last sent frame as a hex list (row by row), as /api/frame accepts it."""
         grid = curtain.last_grid or curtain.layout.blank()
         g = grid if raw else _quantized(grid)
         return {"width": curtain.layout.width, "height": curtain.layout.height,
                 "hex": ["#%02x%02x%02x" % tuple(px) for row in g for px in row],
                 "animation": curtain.state.get("animation"), "mode": curtain.state.get("mode")}
 
-    # ---- kalibratie / debug
+    # ---- calibration / debug
     @app.post("/api/test/pixel", dependencies=dep)
     async def test_pixel(body: TestPixelIn):
         await curtain.test_pixel(body.index, R.hex_to_rgb(body.color))
@@ -282,13 +314,13 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         try:
             pkt = bytes.fromhex(body.hex.replace(" ", ""))
         except ValueError:
-            raise HTTPException(400, "Ongeldige hex")
+            raise HTTPException(400, "Invalid hex")
         await curtain.send_raw(pkt)
         return {"ok": True, "sent": pkt.hex()}
 
     @app.post("/api/raw/packet", dependencies=dep)
     async def raw_packet(cmd: int, payload_hex: str = ""):
-        """Bouwt AA CMD LEN PAYLOAD CS en verstuurt."""
+        """Builds AA CMD LEN PAYLOAD CS and sends it."""
         pkt = P.packet(cmd, bytes.fromhex(payload_hex.replace(" ", "")))
         await curtain.send_raw(pkt)
         return {"ok": True, "sent": pkt.hex()}
@@ -305,13 +337,13 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
             try:
                 save_layout(cfg, d)
             except Exception as e:
-                log.warning("Layout niet opgeslagen: %s", e)
+                log.warning("Layout not saved: %s", e)
         return curtain.layout.to_dict()
 
     @app.post("/api/encoder", dependencies=dep)
     async def set_encoder(name: str):
         if name not in P.PIXEL_ENCODERS:
-            raise HTTPException(400, f"Onbekend; keuze uit {list(P.PIXEL_ENCODERS)}")
+            raise HTTPException(400, f"Unknown; choose from {list(P.PIXEL_ENCODERS)}")
         curtain.pixel_encoder = name
         return {"pixel_encoder": name}
 
@@ -333,7 +365,7 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
     async def nowplaying_enable(enabled: bool = True):
         np = getattr(app.state, "nowplaying", None)
         if not np:
-            raise HTTPException(503, "nowplaying niet geconfigureerd")
+            raise HTTPException(503, "nowplaying not configured")
         np.enabled = enabled
         if not enabled:
             await curtain.stop_animation()
@@ -341,10 +373,10 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
 
     @app.post("/api/nowplaying/push", dependencies=dep)
     async def nowplaying_push(body: dict):
-        """Push vanuit een eigen app: {"title":..,"artist":..,"image":url,"playing":true}."""
+        """Push from your own app: {"title":..,"artist":..,"image":url,"playing":true}."""
         np = getattr(app.state, "nowplaying", None)
         if not np:
-            raise HTTPException(503, "nowplaying niet geconfigureerd")
+            raise HTTPException(503, "nowplaying not configured")
         np.enabled = True
         await np.update({"title": body.get("title"), "artist": body.get("artist"),
                          "image": body.get("image"), "playing": body.get("playing", True)})
@@ -375,7 +407,7 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
             clean = validate(merged)
         except ConfigError as e:
             raise HTTPException(422, {"errors": e.errors})
-        # wat live kan, live toepassen
+        # apply live whatever can be applied live
         needs_restart = False
         for section, sspec in SCHEMA.items():
             for fname, fspec in sspec.get("fields", {}).items():
@@ -388,7 +420,7 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
         try:
             save_config(cfg, clean)
         except Exception as e:
-            raise HTTPException(500, f"Opslaan mislukt: {e}")
+            raise HTTPException(500, f"Saving failed: {e}")
         # live bijwerken
         cfg.update({k: v for k, v in clean.items()})
         curtain.layout = Layout.from_dict(clean["layout"])
@@ -406,13 +438,13 @@ def create_app(curtain: FairyCurtain, cfg: dict) -> FastAPI:
 
     @app.post("/api/restart", dependencies=dep)
     async def restart():
-        """Stopt het proces; Docker (restart: unless-stopped) start het opnieuw."""
+        """Stops the process; Docker (restart: unless-stopped) starts it again."""
         import os, signal
         async def _die():
             await asyncio.sleep(0.5)
             os.kill(os.getpid(), signal.SIGTERM)
         asyncio.create_task(_die())
-        return {"ok": True, "message": "Service herstart…"}
+        return {"ok": True, "message": "Service restarting…"}
 
     # ---- UI
     @app.get("/", include_in_schema=False)

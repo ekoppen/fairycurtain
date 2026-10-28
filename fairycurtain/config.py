@@ -8,10 +8,10 @@ import yaml
 DEFAULTS = {
     "device": {
         "transport": "bleak",          # bleak | esp32 | fake
-        "address": None,               # BLE MAC; None = scannen op naam
+        "address": None,               # BLE MAC; None = scan by name
         "name_prefix": "Hello Fairy-",
-        "adapter": None,               # bijv. hci0
-        "bridge_url": "http://fairy-bridge.local",  # alleen bij transport: esp32
+        "adapter": None,               # e.g. hci0
+        "bridge_url": "http://fairy-bridge.local",  # only for transport: esp32
         "pixel_encoder": "diy",
         "send_init": True,
         "packet_delay": 0.03,
@@ -23,13 +23,14 @@ DEFAULTS = {
         "serpentine": False, "flip_x": False, "flip_y": False,
     },
     "render": {
-        "brightness": 0.5,             # standaard-dimming voor afbeeldingen (LED's zijn fel)
+        "brightness": 0.5,             # default dimming for images (LEDs are bright)
         "gamma": 1.0,
         "font_path": None,
     },
     "api": {
-        "host": "0.0.0.0", "port": 8321,
-        "api_key": None,               # X-API-Key header; None = open
+        "host": "127.0.0.1", "port": 8321,   # loopback by default; set 0.0.0.0 (or FAIRY_HOST) to expose
+        "api_key": None,               # X-API-Key header; None = open (no auth)
+        "allowed_hosts": [],           # extra Host names accepted when api_key is unset (anti DNS rebinding)
     },
     "mqtt": {
         "enabled": False,
@@ -37,7 +38,7 @@ DEFAULTS = {
         "username": None, "password": None,
         "base_topic": "fairycurtain",
         "discovery_prefix": "homeassistant",
-        "device_name": "LED-gordijn",
+        "device_name": "LED curtain",
     },
     "nowplaying": {
         "enabled": False, "source": "http", "url": None, "headers": {}, "interval": 5,
@@ -64,13 +65,17 @@ def load_config(path: str | None = None) -> dict:
     path = path or os.environ.get("FAIRY_CONFIG", "config.yaml")
     cfg = DEFAULTS
     p = Path(path)
+    file_cfg: dict = {}
     if p.exists():
-        cfg = _merge(DEFAULTS, yaml.safe_load(p.read_text()) or {})
-    # kleine env-overrides voor docker-gemak
+        file_cfg = yaml.safe_load(p.read_text()) or {}
+        cfg = _merge(DEFAULTS, file_cfg)
+    # small env overrides for Docker convenience
     if os.environ.get("FAIRY_ADDRESS"):
         cfg["device"]["address"] = os.environ["FAIRY_ADDRESS"]
     if os.environ.get("FAIRY_TRANSPORT"):
         cfg["device"]["transport"] = os.environ["FAIRY_TRANSPORT"]
+    if os.environ.get("FAIRY_HOST") and "host" not in (file_cfg.get("api") or {}):
+        cfg["api"]["host"] = os.environ["FAIRY_HOST"]  # e.g. Docker image sets 0.0.0.0
     if os.environ.get("FAIRY_API_KEY"):
         cfg["api"]["api_key"] = os.environ["FAIRY_API_KEY"]
     if os.environ.get("MQTT_HOST"):
@@ -81,7 +86,7 @@ def load_config(path: str | None = None) -> dict:
 
 
 def save_layout(cfg: dict, layout: dict) -> None:
-    """Schrijft alleen de layout-sectie terug naar config.yaml."""
+    """Writes only the layout section back to config.yaml."""
     p = Path(cfg.get("_path", "config.yaml"))
     data = yaml.safe_load(p.read_text()) if p.exists() else {}
     data = data or {}
@@ -90,7 +95,7 @@ def save_layout(cfg: dict, layout: dict) -> None:
 
 
 def save_config(cfg: dict, data: dict) -> None:
-    """Schrijft de volledige (gevalideerde) config naar config.yaml; houdt onbekende sleutels."""
+    """Writes the full (validated) config to config.yaml; keeps unknown keys."""
     p = Path(cfg.get("_path", "config.yaml"))
     existing = (yaml.safe_load(p.read_text()) if p.exists() else {}) or {}
     for k, v in data.items():

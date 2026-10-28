@@ -6,5 +6,6 @@ COPY pyproject.toml ./
 COPY fairycurtain ./fairycurtain
 RUN pip install --no-cache-dir .
 ENV FAIRY_CONFIG=/config/config.yaml
+ENV FAIRY_HOST=0.0.0.0
 EXPOSE 8321
 CMD ["fairycurtain"]

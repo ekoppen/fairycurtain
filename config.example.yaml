@@ -1,34 +1,35 @@
-# FairyCurtain – kopieer naar config.yaml en pas aan.
+# FairyCurtain – copy to config.yaml and adjust.
 
 device:
-  transport: bleak            # bleak = eigen Bluetooth-adapter | esp32 = via ESP32-bridge | fake = droog testen
-  address: null               # BLE MAC-adres (bv. "BE:29:FC:00:0B:09"); null = scannen op naam
+  transport: bleak            # bleak = own Bluetooth adapter | esp32 = via ESP32 bridge | fake = dry run
+  address: null               # BLE MAC address (e.g. "AA:BB:CC:00:11:22"); null = scan by name
   name_prefix: "Hello Fairy-"
-  adapter: null               # bv. hci0 (alleen bleak op Linux)
-  bridge_url: "http://192.168.1.60"   # alleen bij transport: esp32
-  pixel_encoder: diy          # diy = bevestigd app-protocol | legacy_* alleen voor experimenten
-  send_init: true             # init-reeks zoals de app die stuurt
-  packet_delay: 0.03          # seconden tussen pixel-pakketten
-  max_fps: 0.4                # een DIY-upload kost ~2,5 s; animaties zijn dus traag
-  keepalive_interval: 30      # statusvraag om de link wakker te houden (0 = uit)
+  adapter: null               # e.g. hci0 (bleak on Linux only)
+  bridge_url: "http://192.168.1.60"   # only for transport: esp32
+  pixel_encoder: diy          # diy = confirmed app protocol | legacy_* for experiments only
+  send_init: true             # init sequence as sent by the app
+  packet_delay: 0.03          # seconds between pixel packets
+  max_fps: 0.4                # a DIY upload takes ~2.5 s, so animations are slow
+  keepalive_interval: 30      # status request to keep the link alive (0 = off)
 
-layout:                       # pas aan na kalibratie in de webeditor
+layout:                       # adjust after calibrating in the web editor
   width: 20
   height: 20
-  order: column               # column = slierten van boven naar beneden | row
+  order: column               # column = strands top to bottom | row
   serpentine: false
   flip_x: false
   flip_y: false
 
 render:
-  brightness: 0.5             # 0–1, standaard-dimming voor plaatjes/tekst
+  brightness: 0.5             # 0–1, default dimming for images/text
   gamma: 1.0
-  font_path: null             # bv. /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+  font_path: null             # e.g. /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
 
 api:
-  host: 0.0.0.0
+  host: 127.0.0.1             # loopback only; use 0.0.0.0 to expose on the network (then set api_key!)
   port: 8321
-  api_key: null               # zet een geheim en stuur header X-API-Key
+  api_key: null               # set a secret and send it in the X-API-Key header
+  allowed_hosts: []           # without api_key, only IPs/localhost are accepted as Host; add names like "pi.local" here
 
 mqtt:
   enabled: false
@@ -38,30 +39,30 @@ mqtt:
   password: null
   base_topic: fairycurtain
   discovery_prefix: homeassistant
-  device_name: "LED-gordijn"
+  device_name: "LED curtain"
 
-nowplaying:                   # albumhoes/artiest tonen zodra het nummer wisselt
+nowplaying:                   # show album art/artist whenever the track changes
   enabled: false
   source: http                # http | homeassistant | mqtt
-  # --- http: pollt een JSON-endpoint van je eigen app (RetroHead, HSS, …)
-  url: http://retrohead.local/api/now-playing
+  # --- http: polls a JSON endpoint of your own app or any music API
+  url: http://music.local/api/now-playing
   interval: 5
-  paths:                      # paden in de JSON, bv. "track.cover_url" of "items[0].image"
+  paths:                      # paths into the JSON, e.g. "track.cover_url" or "items[0].image"
     title: title
     artist: artist
     image: image
-    playing: null             # optioneel: pad naar "playing"/true
-  # --- homeassistant: een media_player (Spotify, Sonos, …) via de HA-API
-  # ha_url: http://192.168.178.10:8123
+    playing: null             # optional: path to "playing"/true
+  # --- homeassistant: a media_player (Spotify, Sonos, …) via the HA API
+  # ha_url: http://192.168.1.10:8123
   # ha_token: <long-lived access token>
-  # entity_id: media_player.woonkamer
-  # --- mqtt: JSON-berichten op een topic (vereist mqtt.enabled)
-  # topic: retrohead/nowplaying
-  show: cover                 # cover | text | both (eerst artiest/titel, dan de hoes)
+  # entity_id: media_player.living_room
+  # --- mqtt: JSON messages on a topic (requires mqtt.enabled)
+  # topic: music/nowplaying
+  show: cover                 # cover | text | both (artist/title first, then the cover)
   text_seconds: 6
   fit: cover
-  movement: still             # bv. loop_left om de hoes te laten schuiven
-  idle: keep                  # keep | off | clear  als er niets speelt
+  movement: still             # e.g. loop_left to make the cover scroll
+  idle: keep                  # keep | off | clear  when nothing is playing
   brightness: 1.0
 
 log_level: INFO

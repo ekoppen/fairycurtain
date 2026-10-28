@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -46,7 +46,7 @@ a{color:inherit}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--acc)}
 .page{display:none}.page.active{display:block}
 
-/* hero: het gordijn */
+/* hero: the curtain */
 .hero{background:var(--curtain-bg);border-radius:var(--r);padding:18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
 .hero::before{content:"";position:absolute;inset:-40%;background:radial-gradient(60% 50% at 50% 40%,rgba(242,181,68,.10),transparent 70%);pointer-events:none}
 .hero-grid{display:grid;grid-template-columns:1fr minmax(0,360px) 1fr;align-items:center}
@@ -58,14 +58,14 @@ canvas#live{width:100%;aspect-ratio:1;display:block;image-rendering:auto}
 .now .sub{font-size:12px;color:#8a90a3;margin-top:4px}
 .now img{width:36px;height:36px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;display:none}
 
-/* bronkeuze */
+/* source picker */
 .sources{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0 22px}
 .src{border:1px solid var(--line);background:var(--panel);border-radius:var(--rs);padding:8px 6px;min-height:54px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:500;font-size:14px;text-align:center;transition:border-color .15s,background .15s}
 .src small{font-weight:400;color:var(--mut);font-size:11px}
 .src.active{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--panel));box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 35%,transparent) inset}
 .src:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
-/* panelen */
+/* panels */
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media (max-width:760px){.cols{grid-template-columns:1fr}.sources{grid-template-columns:repeat(3,1fr)}.sources .src:nth-child(4),.sources .src:nth-child(5){grid-column:span 1}}
 @media (max-width:420px){.sources{grid-template-columns:repeat(2,1fr)}}
@@ -97,7 +97,7 @@ label.l{display:flex;align-items:center;gap:8px;font-size:14px}
 .restart{display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--rs);background:color-mix(in srgb,var(--warn) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--warn) 50%,var(--line));margin:12px 0}
 .restart.show{display:flex}
 
-/* tekenen */
+/* drawing */
 canvas#grid{width:100%;aspect-ratio:1;background:#000;border-radius:var(--rs);touch-action:none;cursor:crosshair;image-rendering:pixelated}
 .pal{display:flex;gap:6px;flex-wrap:wrap}
 .pal span{width:26px;height:26px;border-radius:6px;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
@@ -116,162 +116,162 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
 <div class="wrap">
   <header class="top">
     <h1>Fairy<span>Curtain</span></h1>
-    <span class="chip" id="conn"><i></i><span>verbinden…</span></span>
+    <span class="chip" id="conn"><i></i><span>connecting…</span></span>
     <span class="spacer"></span>
-    <button class="btn sm" id="masterBtn" aria-pressed="true" title="Hoofdschakelaar">Aan</button>
-    <button class="iconbtn" id="themeBtn" title="Dag/nacht" aria-label="Dag/nacht-thema wisselen">◐</button>
+    <button class="btn sm" id="masterBtn" aria-pressed="true" title="Master switch">On</button>
+    <button class="iconbtn" id="themeBtn" title="Day/night" aria-label="Toggle day/night theme">◐</button>
   </header>
   <nav class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-page="control">Bediening</button>
-    <button role="tab" aria-selected="false" data-page="config">Instellingen</button>
-    <button role="tab" aria-selected="false" data-page="tools">Hulpmiddelen</button>
+    <button role="tab" aria-selected="true" data-page="control">Control</button>
+    <button role="tab" aria-selected="false" data-page="config">Settings</button>
+    <button role="tab" aria-selected="false" data-page="tools">Tools</button>
   </nav>
 
-  <!-- ===================== BEDIENING ===================== -->
+  <!-- ===================== CONTROL ===================== -->
   <section class="page active" id="page-control">
     <div class="hero">
       <div class="hero-grid"><canvas id="live" width="20" height="20"></canvas></div>
       <div class="now">
-        <div class="kind" id="nowKind">Nu op het gordijn</div>
+        <div class="kind" id="nowKind">Now on the curtain</div>
         <div class="label"><img id="nowImg" alt=""><span id="nowLabel">…</span></div>
         <div class="sub" id="nowSub"></div>
       </div>
     </div>
 
-    <div class="sources" role="group" aria-label="Wat toont het gordijn">
-      <button class="src" data-src="manual" id="srcManual">Eigen plaatje<small>laatste tekening</small></button>
-      <button class="src" data-src="nowplaying">Now playing<small id="npSrcSub">muziek volgen</small></button>
-      <button class="src" data-src="preset">Preset<small>ingebouwd effect</small></button>
-      <button class="src" data-src="color">Kleur<small>effen</small></button>
-      <button class="src" data-src="off">Uit<small>gordijn uit</small></button>
+    <div class="sources" role="group" aria-label="What the curtain shows">
+      <button class="src" data-src="manual" id="srcManual">Own picture<small>last drawing</small></button>
+      <button class="src" data-src="nowplaying">Now playing<small id="npSrcSub">follow music</small></button>
+      <button class="src" data-src="preset">Preset<small>built-in effect</small></button>
+      <button class="src" data-src="color">Color<small>solid</small></button>
+      <button class="src" data-src="off">Off<small>curtain off</small></button>
     </div>
 
     <div class="cols">
       <div>
         <div class="panel">
-          <h2>Tekenen <small>klik of sleep</small></h2>
+          <h2>Draw <small>click or drag</small></h2>
           <canvas id="grid"></canvas>
           <div class="row" style="margin-top:12px">
-            <input type="color" id="color" value="#ff8800" aria-label="Tekenkleur">
+            <input type="color" id="color" value="#ff8800" aria-label="Drawing color">
             <div class="pal" id="pal"></div>
           </div>
           <div class="row">
-            <div class="seg" role="group" aria-label="Gereedschap">
+            <div class="seg" role="group" aria-label="Tool">
               <button data-tool="pen" aria-pressed="true">Pen</button>
-              <button data-tool="erase" aria-pressed="false">Gum</button>
-              <button data-tool="fill" aria-pressed="false">Vullen</button>
+              <button data-tool="erase" aria-pressed="false">Eraser</button>
+              <button data-tool="fill" aria-pressed="false">Fill</button>
             </div>
-            <button class="btn sm" id="clearBtn">Leeg</button>
-            <button class="btn sm" id="mirrorBtn">Spiegel</button>
-            <button class="btn sm" id="liveLoad">Haal van gordijn</button>
+            <button class="btn sm" id="clearBtn">Clear</button>
+            <button class="btn sm" id="mirrorBtn">Mirror</button>
+            <button class="btn sm" id="liveLoad">Load from curtain</button>
           </div>
           <div class="row">
-            <button class="btn primary" id="sendFrame">Zet op het gordijn</button>
+            <button class="btn primary" id="sendFrame">Send to curtain</button>
           </div>
-          <div class="muted">Per lichtje kent het gordijn alleen een kleurtint, wit of uit; donkere kleuren worden uit, grijzige wit.</div>
+          <div class="muted">The curtain only knows a hue per light, plus white or off; dark colors become off, grayish ones white.</div>
         </div>
 
         <div class="panel" style="margin-top:16px">
-          <h2>Afbeelding of GIF</h2>
+          <h2>Image or GIF</h2>
           <div class="row">
             <input type="file" id="imgFile" accept="image/*" style="flex:1;min-width:0">
           </div>
           <div class="row">
-            <select id="fit" aria-label="Passend maken"><option value="cover">vullen (bijsnijden)</option><option value="contain">passend</option><option value="stretch">uitrekken</option></select>
-            <button class="btn sm" id="imgPreview">In editor laden</button>
-            <button class="btn primary" id="imgSend">Zet op het gordijn</button>
+            <select id="fit" aria-label="Fit"><option value="cover">fill (crop)</option><option value="contain">fit</option><option value="stretch">stretch</option></select>
+            <button class="btn sm" id="imgPreview">Load into editor</button>
+            <button class="btn primary" id="imgSend">Send to curtain</button>
           </div>
-          <div class="muted">Een geanimeerde GIF wordt een diashow (één frame per ~3 s).</div>
+          <div class="muted">An animated GIF becomes a slideshow (one frame per ~3 s).</div>
         </div>
       </div>
 
       <div>
         <div class="panel">
-          <h2>Tekst</h2>
+          <h2>Text</h2>
           <div class="row">
-            <input type="text" id="text" placeholder="Bijv. HOI" style="flex:1;min-width:140px" aria-label="Tekst">
-            <input type="color" id="textColor" value="#ffffff" aria-label="Tekstkleur">
+            <input type="text" id="text" placeholder="e.g. HELLO" style="flex:1;min-width:140px" aria-label="Text">
+            <input type="color" id="textColor" value="#ffffff" aria-label="Text color">
           </div>
           <div class="row">
-            <label class="l">sec/pagina <input type="number" id="pageSec" value="4" min="1" max="60" style="width:76px"></label>
-            <button class="btn primary" id="textBtn">Toon tekst</button>
+            <label class="l">sec/page <input type="number" id="pageSec" value="4" min="1" max="60" style="width:76px"></label>
+            <button class="btn primary" id="textBtn">Show text</button>
           </div>
-          <div class="muted">Tekst gaat in pagina's van ~3 tekens. Combineer met beweging "lus links" voor een lopende tekst.</div>
+          <div class="muted">Text is shown in pages of ~3 characters. Combine with the "loop left" movement for scrolling text.</div>
         </div>
 
         <div class="panel" style="margin-top:16px">
-          <h2>Beweging <small>door het gordijn zelf</small></h2>
+          <h2>Movement <small>done by the curtain itself</small></h2>
           <div class="row">
-            <select id="dir" aria-label="Beweging" style="flex:1">
-              <option value="still">stil</option><option value="loop_left">lus links</option><option value="loop_right">lus rechts</option>
-              <option value="loop_up">lus omhoog</option><option value="loop_down">lus omlaag</option>
-              <option value="blink">knipperen</option><option value="breathe">ademen</option>
-              <option value="left">links (1x)</option><option value="right">rechts (1x)</option><option value="up">omhoog (1x)</option><option value="down">omlaag (1x)</option>
+            <select id="dir" aria-label="Movement" style="flex:1">
+              <option value="still">still</option><option value="loop_left">loop left</option><option value="loop_right">loop right</option>
+              <option value="loop_up">loop up</option><option value="loop_down">loop down</option>
+              <option value="blink">blink</option><option value="breathe">breathe</option>
+              <option value="left">left (once)</option><option value="right">right (once)</option><option value="up">up (once)</option><option value="down">down (once)</option>
             </select>
-            <button class="btn primary" id="mvBtn">Toepassen</button>
+            <button class="btn primary" id="mvBtn">Apply</button>
           </div>
-          <div class="row"><label class="l" style="flex:1">snelheid <input type="range" id="mvSpeed" min="0" max="100" value="50"></label></div>
-          <div class="row"><label class="l" style="flex:1">helderheid <input type="range" id="mvBright" min="1" max="100" value="100"></label></div>
+          <div class="row"><label class="l" style="flex:1">speed <input type="range" id="mvSpeed" min="0" max="100" value="50"></label></div>
+          <div class="row"><label class="l" style="flex:1">brightness <input type="range" id="mvBright" min="1" max="100" value="100"></label></div>
         </div>
 
         <div class="panel" style="margin-top:16px">
-          <h2>Preset &amp; kleur</h2>
+          <h2>Preset &amp; color</h2>
           <div class="row">
             <select id="preset" aria-label="Preset" style="flex:1"></select>
             <button class="btn" id="presetBtn">Preset</button>
           </div>
           <div class="row">
-            <input type="color" id="solid" value="#4080ff" aria-label="Effen kleur">
-            <button class="btn" id="solidBtn">Effen kleur</button>
+            <input type="color" id="solid" value="#4080ff" aria-label="Solid color">
+            <button class="btn" id="solidBtn">Solid color</button>
             <span class="spacer"></span>
-            <button class="btn" id="onBtn">Aan</button>
-            <button class="btn danger" id="offBtn">Uit</button>
+            <button class="btn" id="onBtn">On</button>
+            <button class="btn danger" id="offBtn">Off</button>
           </div>
-          <div class="row"><label class="l" style="flex:1">helderheid <input type="range" id="bright" min="1" max="100" value="100"><span id="brightV" style="width:3ch;text-align:right">100</span></label></div>
+          <div class="row"><label class="l" style="flex:1">brightness <input type="range" id="bright" min="1" max="100" value="100"><span id="brightV" style="width:3ch;text-align:right">100</span></label></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ===================== INSTELLINGEN ===================== -->
+  <!-- ===================== SETTINGS ===================== -->
   <section class="page" id="page-config">
     <div class="restart" id="restartBox">
-      <span>Sommige wijzigingen werken pas na een herstart van de service.</span>
+      <span>Some changes only take effect after the service restarts.</span>
       <span class="spacer"></span>
-      <button class="btn sm" id="restartBtn">Herstart service</button>
+      <button class="btn sm" id="restartBtn">Restart service</button>
     </div>
-    <p class="muted" style="margin:0 0 4px">Wijzigingen worden gecontroleerd terwijl je typt. Velden met ⟳ werken pas na een herstart van de service; de rest wordt direct toegepast.</p>
+    <p class="muted" style="margin:0 0 4px">Changes are validated as you type. Fields marked ⟳ only take effect after a service restart; everything else applies immediately.</p>
     <div id="cfgForm"></div>
     <div class="row" style="margin-top:16px;position:sticky;bottom:0;background:var(--bg);padding:12px 0">
       <span class="muted" id="cfgPath"></span>
       <span class="spacer"></span>
-      <button class="btn" id="cfgReload">Opnieuw laden</button>
-      <button class="btn primary" id="cfgSave">Opslaan</button>
+      <button class="btn" id="cfgReload">Reload</button>
+      <button class="btn primary" id="cfgSave">Save</button>
     </div>
   </section>
 
-  <!-- ===================== HULPMIDDELEN ===================== -->
+  <!-- ===================== TOOLS ===================== -->
   <section class="page" id="page-tools">
     <div class="panel">
-      <h2>Kalibratie <small>welk lichtje is welke index?</small></h2>
-      <div class="muted">Licht één lichtje op en kijk waar het zit (±3 s). Standaard (kolommen, boven→beneden) klopt voor dit gordijn; pas alleen aan als het niet klopt, via Instellingen → Raster-layout.</div>
+      <h2>Calibration <small>which light is which index?</small></h2>
+      <div class="muted">Lights one LED so you can see where it is (±3 s). The default (columns, top→bottom) is correct for this curtain; only change it if it doesn't match, via Settings → Grid layout.</div>
       <div class="row">
         <label class="l">index <input type="number" id="pix" value="0" min="0" style="width:90px"></label>
         <button class="btn sm" id="pixPrev">◀</button><button class="btn sm" id="pixNext">▶</button>
-        <button class="btn primary" id="pixGo">Licht op</button>
+        <button class="btn primary" id="pixGo">Light up</button>
         <span class="muted" id="pixHint"></span>
       </div>
     </div>
     <div class="panel" style="margin-top:16px">
-      <h2>Ruwe bytes <small>voor protocol-experimenten</small></h2>
+      <h2>Raw bytes <small>for protocol experiments</small></h2>
       <div class="row">
-        <input type="text" id="rawHex" placeholder="bv. aa020101ae" style="flex:1;font-family:ui-monospace,Menlo,monospace">
-        <button class="btn" id="rawBtn">Stuur</button>
+        <input type="text" id="rawHex" placeholder="e.g. aa020101ae" style="flex:1;font-family:ui-monospace,Menlo,monospace">
+        <button class="btn" id="rawBtn">Send</button>
       </div>
-      <div class="row"><a class="muted" href="/docs" target="_blank">API-documentatie openen</a></div>
+      <div class="row"><a class="muted" href="/docs" target="_blank">Open API documentation</a></div>
     </div>
     <div class="panel" style="margin-top:16px">
-      <h2>Logboek</h2>
+      <h2>Log</h2>
       <div id="log"></div>
     </div>
   </section>
@@ -280,12 +280,12 @@ summary{cursor:pointer;font-weight:500;min-height:36px;display:flex;align-items:
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const api=async(p,opt={})=>{const r=await fetch('/api'+p,{headers:{'Content-Type':'application/json'},...opt});const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(typeof j.detail==='string'?j.detail:(j.detail&&j.detail.errors?'validatiefout':r.status)),{data:j});return j;};
+const api=async(p,opt={})=>{const r=await fetch('/api'+p,{headers:{'Content-Type':'application/json'},...opt});const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(typeof j.detail==='string'?j.detail:(j.detail&&j.detail.errors?'validation error':r.status)),{data:j});return j;};
 const log=m=>{const el=$('#log');el.textContent=(new Date().toLocaleTimeString()+'  '+m+'\n'+el.textContent).slice(0,6000)};
 let toastT;const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200);log(m)};
-const err=e=>toast('Fout: '+(e.message||e));
+const err=e=>toast('Error: '+(e.message||e));
 
-/* thema */
+/* theme */
 const root=document.documentElement;
 function applyTheme(t){if(t)root.setAttribute('data-theme',t);else root.removeAttribute('data-theme');try{t?localStorage.setItem('fc-theme',t):localStorage.removeItem('fc-theme')}catch(e){}}
 try{applyTheme(localStorage.getItem('fc-theme'))}catch(e){}
@@ -294,7 +294,7 @@ $('#themeBtn').onclick=()=>{const cur=root.getAttribute('data-theme')||(matchMed
 /* tabs */
 $$('.tabs [role=tab]').forEach(b=>b.onclick=()=>{$$('.tabs [role=tab]').forEach(x=>x.setAttribute('aria-selected',x===b));$$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+b.dataset.page));if(b.dataset.page==='config')cfgLoad()});
 
-/* live hero: lichtjes */
+/* live hero: lights */
 const live=$('#live'),lx=live.getContext('2d');let liveHex=null,LW=20,LH=20;
 function drawLive(hex,w,h){const S=24;if(live.width!==w*S){live.width=w*S;live.height=h*S}lx.clearRect(0,0,live.width,live.height);
   for(let i=0;i<hex.length;i++){const c=hex[i];const x=(i%w)*S+S/2,y=Math.floor(i/w)*S+S/2;
@@ -303,28 +303,28 @@ function drawLive(hex,w,h){const S=24;if(live.width!==w*S){live.width=w*S;live.h
     lx.fillStyle='#fff';lx.globalAlpha=.75;lx.beginPath();lx.arc(x,y,2.6,0,7);lx.fill();lx.globalAlpha=1;}}
 async function liveLoad(){try{const f=await api('/frame');liveHex=f.hex;LW=f.width;LH=f.height;drawLive(f.hex,f.width,f.height)}catch(e){}}
 
-/* status + bron */
-const KINDS={manual:'Eigen plaatje',nowplaying:'Now playing',preset:'Preset',color:'Effen kleur',off:'Uit',remote:'Afstandsbediening',unknown:'Onbekend'};
-function st(s){const c=$('#conn');c.className='chip'+(s.connected?' on':'');c.querySelector('span').textContent=s.connected?'verbonden':(s.last_error?'niet verbonden':'verbinden…');
+/* status + source */
+const KINDS={manual:'Own picture',nowplaying:'Now playing',preset:'Preset',color:'Solid color',off:'Off',remote:'Remote control',unknown:'Unknown'};
+function st(s){const c=$('#conn');c.className='chip'+(s.connected?' on':'');c.querySelector('span').textContent=s.connected?'connected':(s.last_error?'disconnected':'connecting…');
   if(s.brightness){$('#bright').value=s.brightness;$('#brightV').textContent=s.brightness}
-  const src=s.source||{kind:'unknown',label:'Onbekend'};
-  $('#nowKind').textContent=s.power===false?'Het gordijn is uit':(s.animation?'Nu op het gordijn · animatie':'Nu op het gordijn');
+  const src=s.source||{kind:'unknown',label:'Unknown'};
+  $('#nowKind').textContent=s.power===false?'The curtain is off':(s.animation?'Now on the curtain · animation':'Now on the curtain');
   $('#nowLabel').textContent=src.label||KINDS[src.kind]||'';
   $('#nowSub').textContent=[s.transport&&s.transport.address?s.transport.address:'',s.last_error?'⚠ '+s.last_error:''].filter(Boolean).join('  ');
   $$('.src').forEach(b=>b.classList.toggle('active',b.dataset.src===(s.power===false?'off':src.kind)));
-  const mb=$('#masterBtn');mb.setAttribute('aria-pressed',String(s.master!==false));mb.textContent=s.master===false?'Uit':'Aan';$('.hero').classList.toggle('off',s.master===false);
-  if(s.master===false)$('#nowKind').textContent='Hoofdschakelaar staat uit';}
-$('#masterBtn').onclick=()=>{const on=$('#masterBtn').getAttribute('aria-pressed')!=='true';api('/master',{method:'POST',body:JSON.stringify({on})}).then(s=>{st(s);toast(on?'Gordijn aan':'Gordijn uit; now playing gepauzeerd')}).catch(err)};
+  const mb=$('#masterBtn');mb.setAttribute('aria-pressed',String(s.master!==false));mb.textContent=s.master===false?'Off':'On';$('.hero').classList.toggle('off',s.master===false);
+  if(s.master===false)$('#nowKind').textContent='Master switch is off';}
+$('#masterBtn').onclick=()=>{const on=$('#masterBtn').getAttribute('aria-pressed')!=='true';api('/master',{method:'POST',body:JSON.stringify({on})}).then(s=>{st(s);toast(on?'Curtain on':'Curtain off; now playing paused')}).catch(err)};
 $$('.src').forEach(b=>b.onclick=async()=>{const k=b.dataset.src;try{
   if(k==='off'){await api('/master',{method:'POST',body:'{"on":false}'});refresh();return}
   if((await api('/status')).master===false)await api('/master',{method:'POST',body:'{"on":true}'});
-  if(k==='nowplaying'){await api('/nowplaying/enable?enabled=true',{method:'POST'});toast('Now playing volgt de muziek')}
+  if(k==='nowplaying'){await api('/nowplaying/enable?enabled=true',{method:'POST'});toast('Now playing is following the music')}
   else if(k==='manual'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await sendFrame()}
   else if(k==='preset'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})})}
   else if(k==='color'){await api('/nowplaying/enable?enabled=false',{method:'POST'});await api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})})}
   refresh()}catch(e){err(e)}});
 
-/* tekenen */
+/* drawing */
 let W=20,H=20,grid=[],cv=$('#grid'),ctx=cv.getContext('2d'),tool='pen';
 function initGrid(){grid=Array.from({length:H},()=>Array.from({length:W},()=>'#000000'));cv.width=W*20;cv.height=H*20;draw()}
 function draw(){const s=cv.width/W;for(let y=0;y<H;y++)for(let x=0;x<W;x++){ctx.fillStyle=grid[y][x];ctx.fillRect(x*s,y*s,s,s)}ctx.strokeStyle='#ffffff14';for(let i=0;i<=W;i++){ctx.beginPath();ctx.moveTo(i*s,0);ctx.lineTo(i*s,cv.height);ctx.stroke()}for(let i=0;i<=H;i++){ctx.beginPath();ctx.moveTo(0,i*s);ctx.lineTo(cv.width,i*s);ctx.stroke()}}
@@ -335,20 +335,20 @@ cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId
 $$('.seg [data-tool]').forEach(b=>b.onclick=()=>{tool=b.dataset.tool;$$('.seg [data-tool]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
 $('#clearBtn').onclick=initGrid;$('#mirrorBtn').onclick=()=>{grid=grid.map(r=>[...r].reverse());draw()};
 ['#ff0000','#ff8800','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff','#ff69b4','#8000ff','#000000'].forEach(c=>{const s=document.createElement('span');s.style.background=c;s.title=c;s.onclick=()=>$('#color').value=c;$('#pal').appendChild(s)});
-async function sendFrame(){const r=await api('/frame',{method:'POST',body:JSON.stringify({hex:grid.flat()})});toast('Plaatje staat op het gordijn');return r}
+async function sendFrame(){const r=await api('/frame',{method:'POST',body:JSON.stringify({hex:grid.flat()})});toast('Picture sent to the curtain');return r}
 $('#sendFrame').onclick=()=>sendFrame().then(refresh).catch(err);
-$('#liveLoad').onclick=()=>{if(!liveHex)return;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=liveHex[y*LW+x];if(v!==undefined)grid[y][x]=v}draw();toast('Frame van gordijn geladen')};
+$('#liveLoad').onclick=()=>{if(!liveHex)return;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=liveHex[y*LW+x];if(v!==undefined)grid[y][x]=v}draw();toast('Frame loaded from the curtain')};
 
-/* afbeelding */
-$('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return toast('Kies eerst een bestand');const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const fit=$('#fit').value;let sx=0,sy=0,sw=img.width,sh=img.height,dx=0,dy=0,dw=W,dh=H;
+/* image */
+$('#imgPreview').onclick=()=>{const f=$('#imgFile').files[0];if(!f)return toast('Choose a file first');const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const fit=$('#fit').value;let sx=0,sy=0,sw=img.width,sh=img.height,dx=0,dy=0,dw=W,dh=H;
   if(fit==='cover'){const r=Math.max(W/sw,H/sh);const w=W/r,h=H/r;sx=(sw-w)/2;sy=(sh-h)/2;sw=w;sh=h}else if(fit==='contain'){const r=Math.min(W/sw,H/sh);dw=sw*r;dh=sh*r;dx=(W-dw)/2;dy=(H-dh)/2}
   x.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);const d=x.getImageData(0,0,W,H).data;for(let y=0;y<H;y++)for(let i=0;i<W;i++){const o=(y*W+i)*4;grid[y][i]='#'+[d[o],d[o+1],d[o+2]].map(v=>v.toString(16).padStart(2,'0')).join('')}draw();URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f)};
-$('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return toast('Kies eerst een bestand');const fd=new FormData();fd.append('file',f);fd.append('fit',$('#fit').value);
-  try{const r=await fetch('/api/image',{method:'POST',body:fd});const j=await r.json();if(!r.ok)throw new Error(j.detail);toast(j.animated?('GIF speelt, '+j.frames+' frames'):'Afbeelding staat op het gordijn');refresh()}catch(e){err(e)}};
+$('#imgSend').onclick=async()=>{const f=$('#imgFile').files[0];if(!f)return toast('Choose a file first');const fd=new FormData();fd.append('file',f);fd.append('fit',$('#fit').value);
+  try{const r=await fetch('/api/image',{method:'POST',body:fd});const j=await r.json();if(!r.ok)throw new Error(j.detail);toast(j.animated?('GIF playing, '+j.frames+' frames'):'Image sent to the curtain');refresh()}catch(e){err(e)}};
 
-/* tekst, beweging, preset, kleur */
-$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,page_seconds:+$('#pageSec').value})}).then(r=>{toast('Tekst: '+r.frames+" pagina's");refresh()}).catch(err);
-$('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(()=>toast('Beweging toegepast')).catch(err);
+/* text, movement, preset, color */
+$('#textBtn').onclick=()=>api('/text',{method:'POST',body:JSON.stringify({text:$('#text').value,color:$('#textColor').value,page_seconds:+$('#pageSec').value})}).then(r=>{toast('Text: '+r.frames+' pages');refresh()}).catch(err);
+$('#mvBtn').onclick=()=>api('/movement',{method:'POST',body:JSON.stringify({direction:$('#dir').value,speed:+$('#mvSpeed').value,brightness:+$('#mvBright').value})}).then(()=>toast('Movement applied')).catch(err);
 $('#presetBtn').onclick=()=>api('/preset',{method:'POST',body:JSON.stringify({preset:+$('#preset').value})}).then(refresh).catch(err);
 $('#solidBtn').onclick=()=>api('/color',{method:'POST',body:JSON.stringify({hex:$('#solid').value})}).then(refresh).catch(err);
 $('#onBtn').onclick=()=>api('/master',{method:'POST',body:'{"on":true}'}).then(refresh).catch(err);
@@ -356,16 +356,16 @@ $('#offBtn').onclick=()=>api('/master',{method:'POST',body:'{"on":false}'}).then
 $('#bright').oninput=e=>$('#brightV').textContent=e.target.value;
 $('#bright').onchange=e=>api('/brightness',{method:'POST',body:JSON.stringify({brightness:+e.target.value})}).then(refresh).catch(err);
 
-/* hulpmiddelen */
-const pixGo=async()=>{try{const r=await api('/test/pixel',{method:'POST',body:JSON.stringify({index:+$('#pix').value,color:$('#color').value})});$('#pixHint').textContent=r.expected_xy?('verwacht: kolom '+(r.expected_xy[0]+1)+', rij '+(r.expected_xy[1]+1)):'';refresh()}catch(e){err(e)}};
+/* tools */
+const pixGo=async()=>{try{const r=await api('/test/pixel',{method:'POST',body:JSON.stringify({index:+$('#pix').value,color:$('#color').value})});$('#pixHint').textContent=r.expected_xy?('expected: column '+(r.expected_xy[0]+1)+', row '+(r.expected_xy[1]+1)):'';refresh()}catch(e){err(e)}};
 $('#pixGo').onclick=pixGo;$('#pixNext').onclick=()=>{$('#pix').value=+$('#pix').value+1;pixGo()};$('#pixPrev').onclick=()=>{$('#pix').value=Math.max(0,+$('#pix').value-1);pixGo()};
-$('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>toast('Verstuurd: '+r.sent)).catch(err);
+$('#rawBtn').onclick=()=>api('/raw',{method:'POST',body:JSON.stringify({hex:$('#rawHex').value})}).then(r=>toast('Sent: '+r.sent)).catch(err);
 
 /* now playing */
-async function npLoad(){try{const s=await api('/nowplaying');const c=s.current||{};$('#npSrcSub').textContent=s.enabled?'volgt '+(s.source||''):'muziek volgen';
+async function npLoad(){try{const s=await api('/nowplaying');const c=s.current||{};$('#npSrcSub').textContent=s.enabled?'following '+(s.source||''):'follow music';
   const img=$('#nowImg');if(c.image&&s.enabled){img.src=c.image;img.style.display='inline-block'}else img.style.display='none'}catch(e){}}
 
-/* instellingen */
+/* settings */
 let schema=null,cfg=null;
 async function cfgLoad(){try{if(!schema)schema=await api('/config/schema');const r=await api('/config');cfg=r.config;$('#cfgPath').textContent=r.path||'';$('#restartBox').classList.toggle('show',!!r.restart_pending);buildForm()}catch(e){err(e)}}
 function buildForm(){const f=$('#cfgForm');f.innerHTML='';for(const [sec,ss] of Object.entries(schema)){const p=document.createElement('div');p.className='panel';p.style.marginTop='16px';
@@ -375,9 +375,9 @@ function buildForm(){const f=$('#cfgForm');f.innerHTML='';for(const [sec,ss] of 
   for(const [k,fs] of Object.entries(ss.fields)){const el=fieldEl(sec,k,fs,(cfg[sec]||{})[k]);if(fs.type==='dict'||fs.type==='url')el.classList.add('wide');fl.appendChild(el)}f.appendChild(p)}}
 function fieldEl(sec,key,fs,val){const id='f_'+sec+(key?'_'+key:'');const d=document.createElement('div');d.className='field';d.dataset.key=key?sec+'.'+key:sec;
   const l=document.createElement('label');l.htmlFor=id;l.textContent=fs.label+(fs.restart?' ⟳':'');d.appendChild(l);let inp;
-  if(fs.type==='bool'){inp=document.createElement('select');[['true','ja'],['false','nee']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;inp.appendChild(o)});inp.value=String(!!val)}
+  if(fs.type==='bool'){inp=document.createElement('select');[['true','yes'],['false','no']].forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;inp.appendChild(o)});inp.value=String(!!val)}
   else if(fs.type==='choice'){inp=document.createElement('select');fs.choices.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;inp.appendChild(o)});inp.value=val??fs.choices[0]}
-  else if(fs.type==='dict'){inp=document.createElement('textarea');inp.value=Object.entries(val||{}).map(([k,v])=>k+': '+(v??'')).join('\n');inp.placeholder='sleutel: waarde (één per regel)'}
+  else if(fs.type==='dict'){inp=document.createElement('textarea');inp.value=Object.entries(val||{}).map(([k,v])=>k+': '+(v??'')).join('\n');inp.placeholder='key: value (one per line)'}
   else{inp=document.createElement('input');inp.type=fs.secret?'password':(fs.type==='int'||fs.type==='float'?'number':'text');if(fs.type==='float')inp.step='any';if('min'in fs)inp.min=fs.min;if('max'in fs)inp.max=fs.max;inp.value=val??'';if(fs.secret)inp.autocomplete='new-password'}
   inp.id=id;inp.dataset.type=fs.type;d.appendChild(inp);
   if(fs.help){const hp=document.createElement('div');hp.className='help';hp.textContent=fs.help;d.appendChild(hp)}
@@ -389,8 +389,8 @@ function collect(){const out={};$$('#cfgForm .field').forEach(d=>{const [sec,key
 function showErrors(errs){$$('#cfgForm .field').forEach(d=>{const m=errs[d.dataset.key];d.classList.toggle('invalid',!!m);d.querySelector('.err').textContent=m||''})}
 let vt;function validateLive(){clearTimeout(vt);vt=setTimeout(async()=>{try{const r=await api('/config/validate',{method:'POST',body:JSON.stringify(collect())});showErrors(r.errors||{})}catch(e){}},300)}
 $('#cfgReload').onclick=cfgLoad;
-$('#cfgSave').onclick=async()=>{try{const r=await api('/config',{method:'PUT',body:JSON.stringify(collect())});showErrors({});toast(r.restart_required?'Opgeslagen; herstart nodig voor sommige wijzigingen':'Opgeslagen en toegepast');$('#restartBox').classList.toggle('show',!!r.restart_required);applyLayoutFromCfg()}catch(e){if(e.data&&e.data.detail&&e.data.detail.errors){showErrors(e.data.detail.errors);toast('Controleer de rood gemarkeerde velden')}else err(e)}};
-$('#restartBtn').onclick=async()=>{try{await api('/restart',{method:'POST'});toast('Service herstart… even geduld');setTimeout(()=>location.reload(),6000)}catch(e){err(e)}};
+$('#cfgSave').onclick=async()=>{try{const r=await api('/config',{method:'PUT',body:JSON.stringify(collect())});showErrors({});toast(r.restart_required?'Saved; some changes need a restart':'Saved and applied');$('#restartBox').classList.toggle('show',!!r.restart_required);applyLayoutFromCfg()}catch(e){if(e.data&&e.data.detail&&e.data.detail.errors){showErrors(e.data.detail.errors);toast('Check the fields marked red')}else err(e)}};
+$('#restartBtn').onclick=async()=>{try{await api('/restart',{method:'POST'});toast('Service restarting… one moment');setTimeout(()=>location.reload(),6000)}catch(e){err(e)}};
 async function applyLayoutFromCfg(){try{const s=await api('/status');applyLayout(s.layout)}catch(e){}}
 
 /* init */

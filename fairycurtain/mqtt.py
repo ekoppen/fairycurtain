@@ -1,15 +1,15 @@
 """
-MQTT-koppeling met Home Assistant (discovery).
+MQTT integration with Home Assistant (discovery).
 
-In HA verschijnt:
-  * light.led_gordijn   – aan/uit, RGB, helderheid, effectenlijst (presets)
-  * plus command-topics voor tekst en afbeeldingen (voor automatiseringen):
+In HA this shows up as:
+  * light.led_curtain   – on/off, RGB, brightness, effect list (presets)
+  * plus command topics for text and images (for automations):
 
-    <base>/cmd/text     payload: "Hallo"  of JSON {"text":"Hallo","color":"#ff0000","speed":12}
-    <base>/cmd/image    payload: base64 van een PNG/JPG/GIF, of JSON {"url":"http://…/plaatje.png"}
-    <base>/cmd/frame    payload: JSON {"hex":[...]} zoals /api/frame
-    <base>/cmd/raw      payload: hex-string
-    <base>/cmd/stop     stopt de animatie
+    <base>/cmd/text     payload: "Hello"  or JSON {"text":"Hello","color":"#ff0000","speed":12}
+    <base>/cmd/image    payload: base64 of a PNG/JPG/GIF, or JSON {"url":"http://…/picture.png"}
+    <base>/cmd/frame    payload: JSON {"hex":[...]} like /api/frame
+    <base>/cmd/raw      payload: hex string
+    <base>/cmd/stop     stops the animation
 
   Status: <base>/state (JSON), <base>/availability (online/offline)
 """
@@ -23,6 +23,7 @@ import logging
 from . import protocol as P
 from . import render as R
 from .device import FairyCurtain
+from .netsafe import fetch_image
 
 log = logging.getLogger("fairycurtain.mqtt")
 
@@ -71,22 +72,22 @@ class MqttBridge:
                     np_topic = (self.nowplaying.cfg.get("topic") if self.nowplaying else None)
                     if np_topic:
                         await client.subscribe(np_topic)
-                    log.info("MQTT verbonden met %s", self.cfg["host"])
+                    log.info("MQTT connected to %s", self.cfg["host"])
                     async for msg in client.messages:
                         try:
                             await self._handle(str(msg.topic), msg.payload)
                         except Exception as e:
-                            log.warning("MQTT-commando mislukt (%s): %s", msg.topic, e)
+                            log.warning("MQTT command failed (%s): %s", msg.topic, e)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
                 self._client = None
-                log.warning("MQTT-verbinding weg: %s (opnieuw over 10s)", e)
+                log.warning("MQTT connection lost: %s (retrying in 10s)", e)
                 await asyncio.sleep(10)
 
     # ---------------------------------------------------------- discovery
     async def _announce(self) -> None:
-        dev = {"identifiers": [self.uid], "name": self.cfg.get("device_name", "LED-gordijn"),
+        dev = {"identifiers": [self.uid], "name": self.cfg.get("device_name", "LED curtain"),
                "manufacturer": "Hello Fairy", "model": "BLE LED curtain via FairyCurtain"}
         effects = [P.PRESETS.get(n, f"Preset {n}") for n in range(1, 59)]
         light = {
@@ -97,11 +98,11 @@ class MqttBridge:
             "device": dev, "icon": "mdi:curtains",
         }
         await self._client.publish(f"{self.disc}/light/{self.uid}/config", json.dumps(light), retain=True)
-        text = {"name": "Tekst", "unique_id": self.uid + "_text", "command_topic": f"{self.base}/cmd/text",
+        text = {"name": "Text", "unique_id": self.uid + "_text", "command_topic": f"{self.base}/cmd/text",
                 "state_topic": f"{self.base}/text/state", "availability_topic": f"{self.base}/availability",
                 "device": dev, "icon": "mdi:format-text", "max": 100}
         await self._client.publish(f"{self.disc}/text/{self.uid}_text/config", json.dumps(text), retain=True)
-        stop = {"name": "Stop animatie", "unique_id": self.uid + "_stop", "command_topic": f"{self.base}/cmd/stop",
+        stop = {"name": "Stop animation", "unique_id": self.uid + "_stop", "command_topic": f"{self.base}/cmd/stop",
                 "availability_topic": f"{self.base}/availability", "device": dev, "icon": "mdi:stop"}
         await self._client.publish(f"{self.disc}/button/{self.uid}_stop/config", json.dumps(stop), retain=True)
 
@@ -173,11 +174,11 @@ class MqttBridge:
         elif cmd == "image":
             d = json.loads(text) if text.startswith("{") else {"data": text}
             if d.get("url"):
-                import aiohttp
-                async with aiohttp.ClientSession() as s, s.get(d["url"]) as r:
-                    data = await r.read()
+                data = await fetch_image(d["url"])
             else:
                 data = base64.b64decode(d["data"].split(",", 1)[-1])
+                if len(data) > R.MAX_IMAGE_BYTES:
+                    raise ValueError("image too large")
             kw = dict(fit=d.get("fit", "cover"), brightness=float(d.get("brightness", bright)))
             img = R.bytes_to_image(data)
             if getattr(img, "is_animated", False):

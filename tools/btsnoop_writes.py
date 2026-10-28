@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Haal alle BLE GATT-writes uit een Android btsnoop_hci.log.
+Extract all BLE GATT writes from an Android btsnoop_hci.log.
 
-Zo leg je vast wat de Hello Fairy-app precies stuurt (bv. in de DIY/plaatjes-
-modus), zonder Wireshark:
+This lets you capture exactly what the Hello Fairy app sends (e.g. in DIY/image
+mode) without Wireshark:
 
-  1. Android: Instellingen > Ontwikkelaarsopties > "Bluetooth HCI-snoop-logboek
-     inschakelen". Bluetooth uit en weer aan.
-  2. Open de Hello Fairy-app, verbind, en doe precies één ding (bv. een
-     plaatje van 1 rode pixel linksboven versturen).
-  3. Haal het log op:   adb bugreport bugreport.zip   (log zit in
-     FS/data/misc/bluetooth/logs/btsnoop_hci.log)  of  adb pull /sdcard/btsnoop_hci.log
+  1. Android: Settings > Developer options > enable "Bluetooth HCI snoop log".
+     Turn Bluetooth off and on again.
+  2. Open the Hello Fairy app, connect, and do exactly one thing (e.g. send an
+     image with a single red pixel at the top left).
+  3. Fetch the log:   adb bugreport bugreport.zip   (log is in
+     FS/data/misc/bluetooth/logs/btsnoop_hci.log)  or  adb pull /sdcard/btsnoop_hci.log
   4. python tools/btsnoop_writes.py btsnoop_hci.log
 
-Uitvoer: per write de tijd, ATT-handle en de payload in hex, plus een
-samenvatting per commandobyte. Vergelijk met fairycurtain/protocol.py.
+Output: per write the time, ATT handle and payload in hex, plus a summary per
+command byte. Compare with fairycurtain/protocol.py.
 """
 from __future__ import annotations
 
@@ -40,13 +40,13 @@ def parse(path: str):
         pos += 24
         pkt = data[pos:pos + incl]
         pos += incl
-        # H4 (1002): eerste byte = type; H1 (1001): flags bit0 = richting, geen type-byte
+        # H4 (1002): first byte = type; H1 (1001): flags bit0 = direction, no type byte
         if datalink == 1002:
             if not pkt or pkt[0] != 0x02:
                 continue
             acl = pkt[1:]
         elif datalink == 1001:
-            if (flags & 0x02) == 0:   # 0 = commando/ACL, 1 = event/HCI
+            if (flags & 0x02) == 0:   # 0 = command/ACL, 1 = event/HCI
                 acl = pkt
             else:
                 continue
@@ -57,16 +57,16 @@ def parse(path: str):
         hf, alen = struct.unpack("<HH", acl[:4])
         handle, pb = hf & 0x0FFF, (hf >> 12) & 0x3
         body = acl[4:4 + alen]
-        if pb == 0x02 or pb == 0x00:         # start van L2CAP-pakket
+        if pb == 0x02 or pb == 0x00:         # start of L2CAP packet
             frag[handle] = bytearray(body)
-        else:                                # vervolg
+        else:                                # continuation
             frag[handle] += body
         buf = frag[handle]
         if len(buf) < 4:
             continue
         l2len, cid = struct.unpack("<HH", buf[:4])
         if len(buf) < 4 + l2len:
-            continue                          # nog niet compleet
+            continue                          # not complete yet
         att = bytes(buf[4:4 + l2len])
         frag[handle] = bytearray()
         if cid != 0x0004 or not att:
@@ -92,7 +92,7 @@ def main():
             if val and val[0] == 0xAA and len(val) > 1 and op != ATT_NOTIFY:
                 counts[f"cmd 0x{val[1]:02x}"] += 1
     if counts:
-        print("\nSamenvatting writes per commandobyte:")
+        print("\nSummary of writes per command byte:")
         for k, v in counts.most_common():
             print(f"  {k}: {v}x")
 

@@ -1,4 +1,4 @@
-"""Start: python -m fairycurtain  (of: fairycurtain)"""
+"""Start: python -m fairycurtain  (or: fairycurtain)"""
 from __future__ import annotations
 
 import asyncio
@@ -56,7 +56,10 @@ def main() -> None:
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = build(cfg)
     api = cfg["api"]
-    uvicorn.run(app, host=api.get("host", "0.0.0.0"), port=int(api.get("port", 8321)), log_level="warning")
+    if api.get("host") not in ("127.0.0.1", "localhost", "::1") and not api.get("api_key"):
+        logging.getLogger("fairycurtain").warning(
+            "API is exposed on %s without api_key: anyone on the network can control the curtain", api.get("host"))
+    uvicorn.run(app, host=api.get("host", "127.0.0.1"), port=int(api.get("port", 8321)), log_level="warning")
 
 
 if __name__ == "__main__":

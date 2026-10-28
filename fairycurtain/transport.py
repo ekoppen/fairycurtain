@@ -1,12 +1,12 @@
 """
-Transportlaag: hoe de bytes bij het gordijn komen.
+Transport layer: how the bytes reach the curtain.
 
-  * BleakTransport   – directe BLE-verbinding via een Bluetooth-adapter op de
-                       host waar deze service draait (USB-dongle, Pi, …).
-  * Esp32Transport   – HTTP naar een ESP32 met de `esp32-bridge` firmware; de
-                       ESP32 doet de BLE-writes. Handig als je server geen
-                       Bluetooth heeft of te ver van het gordijn staat.
-  * FakeTransport    – voor tests/dry-run; logt alleen.
+  * BleakTransport   – direct BLE connection via a Bluetooth adapter on the
+                       host running this service (USB dongle, Pi, …).
+  * Esp32Transport   – HTTP to an ESP32 running the `esp32-bridge` firmware; the
+                       ESP32 performs the BLE writes. Handy if your server has
+                       no Bluetooth or is too far from the curtain.
+  * FakeTransport    – for tests/dry runs; only logs.
 """
 from __future__ import annotations
 
@@ -61,14 +61,14 @@ class BleakTransport(Transport):
     async def _find_address(self) -> str:
         from bleak import BleakScanner
         kw = {"adapter": self.adapter} if self.adapter else {}
-        log.info("Scannen naar '%s*' (%.0fs)…", self.name_prefix, self.scan_timeout)
+        log.info("Scanning for '%s*' (%.0fs)…", self.name_prefix, self.scan_timeout)
         devices = await BleakScanner.discover(timeout=self.scan_timeout, **kw)
         for d in devices:
             if d.name and d.name.startswith(self.name_prefix):
-                log.info("Gevonden: %s (%s)", d.name, d.address)
+                log.info("Found: %s (%s)", d.name, d.address)
                 return d.address
-        raise ConnectionError(f"Geen apparaat gevonden met naam '{self.name_prefix}*'. "
-                              "Staat de app op je telefoon nog verbonden? Die moet los.")
+        raise ConnectionError(f"No device found with name '{self.name_prefix}*'. "
+                              "Is the phone app still connected? It must be disconnected.")
 
     async def connect(self) -> None:
         from bleak import BleakClient
@@ -79,20 +79,20 @@ class BleakTransport(Transport):
         self.address = addr
         self._write_char = self._client.services.get_characteristic(P.WRITE_UUID)
         if self._write_char is None:
-            raise ConnectionError("Schrijf-characteristic niet gevonden; is dit wel een Hello Fairy?")
-        try:  # MTU onderhandelen (BlueZ doet dit automatisch; andere backends niet altijd)
+            raise ConnectionError("Write characteristic not found; is this really a Hello Fairy?")
+        try:  # negotiate MTU (BlueZ does this automatically; other backends don't always)
             await self._client._backend._acquire_mtu()  # type: ignore[attr-defined]
         except Exception:
             pass
         self.mtu = getattr(self._client, "mtu_size", 23) or 23
         try:
             await self._client.start_notify(P.NOTIFY_UUID, self._handle_notify)
-        except Exception as e:  # notify is optioneel
-            log.warning("Notificaties niet beschikbaar: %s", e)
-        log.info("Verbonden met %s, MTU=%d", addr, self.mtu)
+        except Exception as e:  # notify is optional
+            log.warning("Notifications unavailable: %s", e)
+        log.info("Connected to %s, MTU=%d", addr, self.mtu)
 
     def _on_disconnect(self, _client) -> None:
-        log.warning("BLE-verbinding verbroken")
+        log.warning("BLE connection lost")
 
     def _handle_notify(self, _sender, data: bytearray) -> None:
         if self._notify_cb:
@@ -108,7 +108,7 @@ class BleakTransport(Transport):
 
     async def write(self, data: bytes) -> None:
         if not self.is_connected:
-            raise ConnectionError("Niet verbonden")
+            raise ConnectionError("Not connected")
         await self._client.write_gatt_char(self._write_char, data, response=False)
 
     @property
@@ -126,12 +126,12 @@ class BleakTransport(Transport):
 
 class Esp32Transport(Transport):
     """
-    Praat met esp32-bridge/fairy_bridge.ino:
+    Talks to esp32-bridge/fairy_bridge.ino:
         GET  /status                -> {"connected":true,"mtu":247,"mac":"..."}
-        POST /connect?mac=AA:BB..   -> verbinden (mac optioneel: scant op naam)
+        POST /connect?mac=AA:BB..   -> connect (mac optional: scans by name)
         POST /disconnect
         POST /write   body=hex      -> raw GATT write
-        GET  /notify                -> {"queue":["aa0200ac", ...]} (en leegt de wachtrij)
+        GET  /notify                -> {"queue":["aa0200ac", ...]} (and empties the queue)
     """
     name = "esp32"
 
@@ -163,17 +163,17 @@ class Esp32Transport(Transport):
             except aiohttp.ClientResponseError as e:
                 if e.status != 503:
                     raise
-                log.warning("Verbinden op MAC %s mislukt; bridge gaat scannen op naam", self.address)
+                log.warning("Connecting to MAC %s failed; bridge will scan by name", self.address)
         if not (isinstance(res, dict) and res.get("connected")):
             res = await self._http("POST", "/connect")
         if not (isinstance(res, dict) and res.get("connected")):
-            raise ConnectionError(f"ESP32-bridge kon niet verbinden: {res}")
+            raise ConnectionError(f"ESP32 bridge could not connect: {res}")
         self.mtu = int(res.get("mtu", 23))
         self.address = res.get("mac", self.address)
         self._connected = True
         if self._poll_task is None:
             self._poll_task = asyncio.create_task(self._poll_notify())
-        log.info("Verbonden via ESP32-bridge %s (MTU %d)", self.base_url, self.mtu)
+        log.info("Connected via ESP32 bridge %s (MTU %d)", self.base_url, self.mtu)
 
     async def _poll_notify(self) -> None:
         while True:
@@ -183,7 +183,7 @@ class Esp32Transport(Transport):
                     if self._notify_cb:
                         self._notify_cb(bytes.fromhex(h))
                 self._status_tick = getattr(self, "_status_tick", 0) + 1
-                if self._status_tick % 5 == 0:   # status maar 1x per 10 s
+                if self._status_tick % 5 == 0:   # status only once per 10 s
                     st = await self._http("GET", "/status")
                     self._connected = bool(isinstance(st, dict) and st.get("connected"))
             except asyncio.CancelledError:
@@ -208,7 +208,7 @@ class Esp32Transport(Transport):
 
     async def write(self, data: bytes) -> None:
         if not self._connected:
-            raise ConnectionError("Niet verbonden (ESP32)")
+            raise ConnectionError("Not connected (ESP32)")
         await self._http("POST", "/write", data=data.hex())
 
     @property
@@ -225,7 +225,7 @@ class Esp32Transport(Transport):
 # ---------------------------------------------------------------- fake ----
 
 class FakeTransport(Transport):
-    """Geen hardware: logt alle writes en beantwoordt met een ACK."""
+    """No hardware: logs all writes and answers with an ACK."""
     name = "fake"
     mtu = 247
 
@@ -243,7 +243,7 @@ class FakeTransport(Transport):
 
     async def write(self, data: bytes) -> None:
         if not self._connected:
-            raise ConnectionError("Niet verbonden (fake)")
+            raise ConnectionError("Not connected (fake)")
         self.writes.append(data)
         log.debug("fake write %s", data.hex())
         if self.auto_ack and self._notify_cb and len(data) > 1 and data[1] in (P.CMD_POWER, P.CMD_COLOR):
@@ -263,4 +263,4 @@ def make_transport(cfg: dict) -> Transport:
         return Esp32Transport(cfg["bridge_url"], address=cfg.get("address"))
     if kind == "fake":
         return FakeTransport()
-    raise ValueError(f"Onbekend transport: {kind}")
+    raise ValueError(f"Unknown transport: {kind}")

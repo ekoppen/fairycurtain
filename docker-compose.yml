@@ -1,6 +1,6 @@
 # FairyCurtain
 #
-# Standaard: via de ESP32-bridge (transport: esp32). Werkt overal, ook op Mac/Windows.
+# Default: via the ESP32 bridge (transport: esp32). Works anywhere, including Mac/Windows.
 services:
   fairycurtain:
     build: .
@@ -11,10 +11,10 @@ services:
     volumes:
       - ./config.yaml:/config/config.yaml
     # environment:
-    #   FAIRY_API_KEY: geheim
+    #   FAIRY_API_KEY: change-me
 
-# Alternatief voor transport: bleak (eigen Bluetooth-adapter, alleen Linux-host):
-# vervang `ports:` door `network_mode: host`, en voeg toe:
+# Alternative for transport: bleak (own Bluetooth adapter, Linux host only):
+# replace `ports:` with `network_mode: host`, and add:
 #     volumes:
 #       - /var/run/dbus:/var/run/dbus:ro
 #     cap_add: [NET_ADMIN, NET_RAW]

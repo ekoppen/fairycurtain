@@ -1,7 +1,6 @@
 """
-FairyCurtain: één object dat de verbinding, de status en het versturen van
-commando's/frames/animaties beheert. Alle API-, MQTT- en UI-lagen praten
-hiermee.
+FairyCurtain: a single object that manages the connection, the state and the
+sending of commands/frames/animations. All API, MQTT and UI layers talk to it.
 """
 from __future__ import annotations
 
@@ -43,7 +42,7 @@ class FairyCurtain:
             "rgb": [255, 255, 255], "brightness": 100,
             "preset": None, "animation": None, "last_error": None,
             "source": {"kind": "unknown", "label": "Onbekend", "since": None},
-            "master": True,   # hoofdschakelaar: False = alles blijft uit, ook now playing
+            "master": True,   # master switch: False = everything stays off, including now playing
             "last_notification": None, "info": None,
             "movement": {"direction": 0, "brightness": 100, "speed": 100},
         }
@@ -57,7 +56,7 @@ class FairyCurtain:
         self._initialised = False
         transport.on_notify(self._on_notify)
 
-    # ------------------------------------------------------------ status --
+    # ------------------------------------------------------------ state --
 
     def on_state(self, cb: StateCb) -> None:
         self._listeners.append(cb)
@@ -71,7 +70,7 @@ class FairyCurtain:
                 log.debug("listener: %s", e)
 
     def set_source(self, kind: str, label: str) -> None:
-        """Wat bepaalt nu de weergave: manual | nowplaying | preset | color | off | remote."""
+        """What currently determines the display: manual | nowplaying | preset | color | off | remote."""
         self.state["source"] = {"kind": kind, "label": label, "since": time.time()}
 
     def status(self) -> dict:
@@ -91,7 +90,7 @@ class FairyCurtain:
         if info:
             self.state["info"] = info
             if info["columns"] and info["rows"] and (info["columns"], info["rows"]) != (self.layout.width, self.layout.height):
-                log.info("Gordijn meldt %dx%d (%d LED's); layout aangepast", info["columns"], info["rows"], info["pixel_count"])
+                log.info("Curtain reports %dx%d (%d LEDs); layout adjusted", info["columns"], info["rows"], info["pixel_count"])
                 self.layout.width, self.layout.height = info["columns"], info["rows"]
             self._emit()
             return
@@ -114,7 +113,7 @@ class FairyCurtain:
             self.set_source("remote", "Afstandsbediening")
         self._emit()
 
-    # -------------------------------------------------------- verbinding --
+    # -------------------------------------------------------- connection --
 
     async def connect(self) -> None:
         async with self._lock:
@@ -126,28 +125,28 @@ class FairyCurtain:
         await self.transport.connect()
         self._initialised = False
         self.state["last_error"] = None
-        # Net als de app: direct na verbinden de init-reeks sturen (gordijn lijkt dit te verwachten).
+        # Like the app: send the init sequence right after connecting (the curtain seems to expect it).
         if self.send_init:
             try:
                 await self._ensure_init()
             except Exception as e:
-                log.debug("init na verbinden: %s", e)
+                log.debug("init after connect: %s", e)
         self._emit()
 
     async def start(self) -> None:
-        """Verbind (met retries op de achtergrond) – aanroepen bij opstarten."""
+        """Connect (with background retries) – call on startup."""
         try:
             await self.connect()
         except Exception as e:
             self.state["last_error"] = str(e)
-            log.warning("Eerste verbinding mislukt: %s (blijf proberen)", e)
+            log.warning("First connection failed: %s (will keep trying)", e)
         if self._reconnect_task is None:
             self._reconnect_task = asyncio.create_task(self._reconnect_loop())
         if self._keepalive_task is None and self.keepalive_interval > 0:
             self._keepalive_task = asyncio.create_task(self._keepalive_loop())
 
     async def _keepalive_loop(self) -> None:
-        """Statusvraag (AA 01 00 AB) zoals de app; houdt de link wakker en de status actueel."""
+        """Status request (AA 01 00 AB) like the app; keeps the link alive and the state current."""
         while True:
             await asyncio.sleep(self.keepalive_interval)
             if self.transport.is_connected and not self._lock.locked():
@@ -163,7 +162,7 @@ class FairyCurtain:
             if not self.transport.is_connected and not self._lock.locked():
                 try:
                     await self.connect()
-                    log.info("Opnieuw verbonden")
+                    log.info("Reconnected")
                 except Exception as e:
                     self.state["last_error"] = str(e)
                     log.debug("reconnect: %s", e)
@@ -177,10 +176,10 @@ class FairyCurtain:
         await self.transport.disconnect()
         self._emit()
 
-    # ---------------------------------------------------------- versturen --
+    # ---------------------------------------------------------- sending --
 
     async def _send(self, pkt: bytes, wait_ack: bool = False) -> None:
-        """Niet-gelockte write. Roep aan binnen self._lock."""
+        """Unlocked write. Call while holding self._lock."""
         if not self.transport.is_connected:
             await self._connect_locked()
         self._ack.clear()
@@ -189,7 +188,7 @@ class FairyCurtain:
             try:
                 await asyncio.wait_for(self._ack.wait(), self.ack_timeout)
             except asyncio.TimeoutError:
-                log.debug("Geen ACK binnen %.1fs voor %s", self.ack_timeout, pkt.hex())
+                log.debug("No ACK within %.1fs for %s", self.ack_timeout, pkt.hex())
         else:
             await asyncio.sleep(self.packet_delay)
 
@@ -214,13 +213,13 @@ class FairyCurtain:
         self._emit()
 
     async def set_master(self, on: bool) -> None:
-        """Hoofdschakelaar. Uit = gordijn uit en automatische bronnen (now playing) gepauzeerd."""
+        """Master switch. Off = curtain off and automatic sources (now playing) paused."""
         self.state["master"] = bool(on)
         if not on:
             await self.set_power(False)
         else:
             await self.set_power(True)
-            self.set_source("unknown", "Aan, wacht op inhoud")
+            self.set_source("unknown", "On, waiting for content")
         self._emit()
 
     @property
@@ -273,7 +272,7 @@ class FairyCurtain:
         await self._ensure_init()
         packets = self._packets_for(grid)
         if self.pixel_encoder == "diy":
-            # Exacte reeks en timing uit de app-capture (zie protocol.py).
+            # Exact sequence and timing from the app capture (see protocol.py).
             mv = self.state["movement"]
             await self._send(P.diy_mode(0x03, mv["direction"], mv["brightness"], mv["speed"]))
             await asyncio.sleep(0.0165)
@@ -296,7 +295,7 @@ class FairyCurtain:
 
     async def set_movement(self, direction=0, brightness: Optional[int] = None,
                            speed: Optional[int] = None, apply: bool = True) -> None:
-        """Beweging/knipperen/ademen van het huidige DIY-plaatje (door het gordijn zelf)."""
+        """Movement/blink/breathe of the current DIY picture (done by the curtain itself)."""
         if isinstance(direction, str):
             direction = P.DIRECTIONS[direction]
         mv = self.state["movement"]
@@ -314,17 +313,17 @@ class FairyCurtain:
         await self.stop_animation()
         async with self._lock:
             await self._show_grid_locked(grid)
-        self.set_source(*(source or ("manual", "Eigen plaatje")))
+        self.set_source(*(source or ("manual", "Own picture")))
         self._emit()
 
     async def show_solid(self, r: int, g: int, b: int) -> None:
         await self.show_grid(solid(self.layout.width, self.layout.height, (r, g, b)))
 
     async def test_pixel(self, index: int, color=(255, 255, 255), clear: bool = True) -> None:
-        """Eén fysieke pixel aanzetten (kalibratie van de layout)."""
+        """Light one physical pixel (layout calibration)."""
         pixels = [(0, 0, 0)] * self.layout.count
         pixels[index % self.layout.count] = tuple(color)
-        # terug naar grid via de inverse mapping, zodat dezelfde upload-code wordt gebruikt
+        # back to a grid via the inverse mapping so the same upload code is used
         grid = self.layout.blank()
         for i, px in enumerate(pixels):
             if px != (0, 0, 0):
@@ -332,7 +331,7 @@ class FairyCurtain:
                 grid[y][x] = px
         await self.show_grid(grid)
 
-    # ---------------------------------------------------------- animatie --
+    # ---------------------------------------------------------- animation --
 
     async def play(self, frames: List[Frame], loop: bool = True, name: str = "animation",
                    source: tuple[str, str] | None = None) -> None:
@@ -345,7 +344,7 @@ class FairyCurtain:
             return
         self.set_source(*src)
         self._anim_task = asyncio.create_task(self._anim_loop(frames, loop))
-        self.state["animation"] = name
+        self.state["animation"] = name[:64]
         self._emit()
 
     async def _anim_loop(self, frames: List[Frame], loop: bool) -> None:
@@ -363,7 +362,7 @@ class FairyCurtain:
             raise
         except Exception as e:
             self.state["last_error"] = f"animatie: {e}"
-            log.warning("Animatie gestopt: %s", e)
+            log.warning("Animation stopped: %s", e)
         finally:
             self.state["animation"] = None
             self._emit()

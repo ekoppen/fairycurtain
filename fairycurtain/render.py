@@ -1,8 +1,8 @@
 """
-Afbeeldingen, GIF's en tekst omzetten naar frames van width x height pixels.
+Convert images, GIFs and text to frames of width x height pixels.
 
-Een 'frame' is een Grid: list[rows][cols] van (r, g, b).
-Een animatie is een lijst van (frame, duur_in_seconden).
+A 'frame' is a Grid: list[rows][cols] of (r, g, b).
+An animation is a list of (frame, duration_in_seconds).
 """
 from __future__ import annotations
 
@@ -14,6 +14,14 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageSequence
 from .layout import Grid, RGB
 
 Frame = Tuple[Grid, float]
+
+# Input limits (shared by the REST API, MQTT and now playing) to prevent resource exhaustion.
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_GIF_FRAMES = 200
+MAX_IMAGE_DIMENSION = 2048          # per side, checked before decoding
+MAX_GIF_TOTAL_PIXELS = 50_000_000   # summed over all decoded GIF frames
+MAX_TEXT_CHARS = 200
+MIN_FONT_SIZE, MAX_FONT_SIZE = 4, 64
 
 
 def _apply_levels(img: Image.Image, brightness: float, gamma: float) -> Image.Image:
@@ -31,7 +39,7 @@ def image_to_grid(
     width: int,
     height: int,
     fit: str = "cover",          # cover | contain | stretch
-    brightness: float = 1.0,     # 0..1 (LED's zijn fel; 0.3-0.6 is vaak prettig)
+    brightness: float = 1.0,     # 0..1 (LEDs are bright; 0.3-0.6 is often pleasant)
     gamma: float = 1.0,
     background: RGB = (0, 0, 0),
     resample=Image.LANCZOS,
@@ -49,7 +57,10 @@ def image_to_grid(
 
 
 def bytes_to_image(data: bytes) -> Image.Image:
-    return Image.open(io.BytesIO(data))
+    img = Image.open(io.BytesIO(data))  # lazy: reads the header only
+    if max(img.size) > MAX_IMAGE_DIMENSION:
+        raise ValueError(f"image too large ({img.size[0]}x{img.size[1]}, max {MAX_IMAGE_DIMENSION} per side)")
+    return img
 
 
 def image_bytes_to_grid(data: bytes, width: int, height: int, **kw) -> Grid:
@@ -61,7 +72,11 @@ def gif_bytes_to_frames(
 ) -> List[Frame]:
     img = bytes_to_image(data)
     frames: List[Frame] = []
+    total_pixels = 0
     for fr in ImageSequence.Iterator(img):
+        total_pixels += fr.size[0] * fr.size[1]
+        if len(frames) >= MAX_GIF_FRAMES or total_pixels > MAX_GIF_TOTAL_PIXELS:
+            break
         dur = fr.info.get("duration", default_duration * 1000) / 1000.0
         frames.append((image_to_grid(fr.convert("RGB"), width, height, **kw), max(0.02, dur)))
     if not frames:
@@ -69,7 +84,7 @@ def gif_bytes_to_frames(
     return frames
 
 
-# ------------------------------------------------------------------ tekst ----
+# ------------------------------------------------------------------ text ----
 
 def _font(size: int, path: Optional[str] = None) -> ImageFont.ImageFont:
     if path:
@@ -91,8 +106,8 @@ def render_text_strip(
     font_path: Optional[str] = None,
     font_size: Optional[int] = None,
 ) -> Image.Image:
-    """Tekst als brede strook van `height` pixels hoog."""
-    size = font_size or max(6, int(height * 0.9))
+    """Text as a wide strip `height` pixels tall."""
+    size = max(MIN_FONT_SIZE, min(MAX_FONT_SIZE, font_size)) if font_size else max(6, int(height * 0.9))
     font = _font(size, font_path)
     dummy = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     l, t, r, b = dummy.textbbox((0, 0), text, font=font)
@@ -110,11 +125,12 @@ def text_to_frames(
     color: RGB = (255, 255, 255),
     background: RGB = (0, 0, 0),
     scroll: bool = True,
-    speed: float = 12.0,           # pixels per seconde
+    speed: float = 12.0,           # pixels per second
     font_path: Optional[str] = None,
     font_size: Optional[int] = None,
     brightness: float = 1.0,
 ) -> List[Frame]:
+    text = text[:MAX_TEXT_CHARS]
     strip = render_text_strip(text, height, color, background, font_path, font_size)
     strip = _apply_levels(strip, brightness, 1.0)
     if not scroll or strip.width <= width:
@@ -122,7 +138,7 @@ def text_to_frames(
         canvas.paste(strip, ((canvas.width - strip.width) // 2, 0))
         canvas = canvas.crop((0, 0, width, height))
         return [(image_to_grid(canvas, width, height, fit="stretch"), 1.0)]
-    # scroll van rechts naar links: pad met `width` zwart aan beide kanten
+    # scroll right to left: pad with `width` black on both sides
     padded = Image.new("RGB", (strip.width + 2 * width, height), background)
     padded.paste(strip, (width, 0))
     step_dur = 1.0 / max(1.0, speed)
@@ -140,10 +156,10 @@ def text_to_pages(
     page_seconds: float = 4.0, font_path: Optional[str] = None, font_size: Optional[int] = None,
 ) -> List[Frame]:
     """
-    Tekst in 'pagina's' die elk in width x height passen (bv. 3 tekens per pagina
-    bij 20 px). Geschikt voor het gordijn, waar een frame ~2,5 s kost om te uploaden.
+    Text in 'pages' that each fit in width x height (e.g. 3 characters per page
+    at 20 px). Suited to the curtain, where a frame takes ~2.5 s to upload.
     """
-    words = text.split()
+    words = text[:MAX_TEXT_CHARS].split()
     pages: List[str] = []
     cur = ""
     def fits(t: str) -> bool:
@@ -156,7 +172,7 @@ def text_to_pages(
         if cur:
             pages.append(cur)
             cur = ""
-        # woord zelf te lang: in stukken knippen
+        # word itself too long: split into pieces
         piece = ""
         for ch in w:
             if fits(piece + ch):

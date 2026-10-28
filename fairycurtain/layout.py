@@ -1,11 +1,11 @@
 """
-Mapping tussen een 2D-raster (x, y) en de fysieke pixel-index op het gordijn.
+Mapping between a 2D grid (x, y) and the physical pixel index on the curtain.
 
-Een LED-gordijn bestaat uit verticale slierten. Meestal loopt de index per
-sliert van boven naar beneden en begint de volgende sliert weer bovenaan,
-maar sommige gordijnen zijn 'serpentine' (om en om omhoog/omlaag). Welke het
-is weet je pas na kalibreren (zie /api/test/pixel en de knop 'Kalibreren' in
-de webeditor). Alles is instelbaar in config.yaml.
+An LED curtain consists of vertical strands. Usually the index runs top to
+bottom along a strand and the next strand starts at the top again, but some
+curtains are 'serpentine' (alternately up/down). You only know which one you
+have after calibrating (see /api/test/pixel and the 'Calibrate' button in the
+web editor). Everything is configurable in config.yaml.
 """
 from __future__ import annotations
 
@@ -20,11 +20,11 @@ Grid = List[List[RGB]]  # grid[y][x]
 class Layout:
     width: int = 20
     height: int = 20
-    order: str = "column"       # "column" (slierten) of "row"
-    serpentine: bool = False    # om-en-om richting per sliert/rij
-    flip_x: bool = False        # eerste sliert rechts i.p.v. links
-    flip_y: bool = False        # index 0 onderaan i.p.v. bovenaan
-    pixel_count: int | None = None  # standaard width*height
+    order: str = "column"       # "column" (strands) or "row"
+    serpentine: bool = False    # alternate direction per strand/row
+    flip_x: bool = False        # first strand on the right instead of the left
+    flip_y: bool = False        # index 0 at the bottom instead of the top
+    pixel_count: int | None = None  # defaults to width*height
 
     @property
     def count(self) -> int:
@@ -44,7 +44,7 @@ class Layout:
         return major * minor_len + minor
 
     def xy_of(self, index: int) -> Tuple[int, int]:
-        """Inverse van index_of (voor kalibratie-weergave)."""
+        """Inverse of index_of (for calibration display)."""
         for y in range(self.height):
             for x in range(self.width):
                 if self.index_of(x, y) == index:

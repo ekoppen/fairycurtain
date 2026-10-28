@@ -16,11 +16,11 @@ def test_validate_ok_and_errors():
 
 
 def test_mask_and_merge():
-    cfg = copy.deepcopy(DEFAULTS); cfg["api"]["api_key"] = "supergeheim123"; cfg["nowplaying"]["headers"] = {"Authorization": "Bearer abcdefghijkl"}
+    cfg = copy.deepcopy(DEFAULTS); cfg["api"]["api_key"] = "supersecret123"; cfg["nowplaying"]["headers"] = {"Authorization": "Bearer abcdefghijkl"}
     m = mask_secrets(cfg)
     assert m["api"]["api_key"].startswith("••••") and m["nowplaying"]["headers"]["Authorization"].endswith("ijkl")
     back = merge_secrets(copy.deepcopy(m), cfg)
-    assert back["api"]["api_key"] == "supergeheim123" and back["nowplaying"]["headers"]["Authorization"] == "Bearer abcdefghijkl"
+    assert back["api"]["api_key"] == "supersecret123" and back["nowplaying"]["headers"]["Authorization"] == "Bearer abcdefghijkl"
 
 
 @pytest.mark.asyncio
@@ -29,7 +29,7 @@ async def test_config_endpoints(tmp_path):
     cfg = copy.deepcopy(DEFAULTS); cfg["device"]["transport"] = "fake"; cfg["device"]["keepalive_interval"] = 0
     cfg["_path"] = str(tmp_path / "config.yaml")
     app = build(cfg)
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://127.0.0.1") as ac:
         r = await ac.get("/api/config/schema"); assert "device" in r.json()
         r = await ac.get("/api/config"); assert r.json()["config"]["layout"]["width"] == 20
         body = r.json()["config"]; body["layout"]["width"] = 0

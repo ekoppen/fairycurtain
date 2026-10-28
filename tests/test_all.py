@@ -45,7 +45,7 @@ def test_pixel_encoder_covers_all_pixels():
 
 
 def test_diy_vectors():
-    # uit kmich/PROTOCOL.md: groen -> 0x3C, blauw -> 0x78, D0-vector "aad00403641401fa"
+    # from kmich/PROTOCOL.md: green -> 0x3C, blue -> 0x78, D0-vector "aad00403641401fa"
     assert P.rgb_to_pixel_byte(0, 255, 0) == 0x3C and P.rgb_to_pixel_byte(0, 0, 255) == 0x78
     assert P.diy_mode(1, 3, 100, 20).hex() == "aad00403641401fa"
     assert P.diy_mode(3).hex() == "aad0040064640349"
@@ -77,7 +77,7 @@ def test_render_image_and_text():
     img = Image.new("RGB", (100, 60), (200, 100, 0))
     g = R.image_to_grid(img, 20, 20, brightness=0.5)
     assert len(g) == 20 and len(g[0]) == 20 and g[0][0] == (100, 50, 0)
-    frames = R.text_to_frames("Hoi", 20, 20, speed=10)
+    frames = R.text_to_frames("Hello", 20, 20, speed=10)
     assert len(frames) > 20 and all(len(f[0]) == 20 for f in frames)
     assert any(any(px != (0, 0, 0) for px in row) for g, _ in frames[len(frames)//2:len(frames)//2+1] for row in g)
     buf = io.BytesIO()
@@ -91,7 +91,7 @@ def test_render_image_and_text():
 def setup():
     t = FakeTransport()
     c = FairyCurtain(t, Layout(), packet_delay=0.0, max_fps=100, keepalive_interval=0)
-    cfg = {**DEFAULTS, "api": {"api_key": "geheim"}, "render": {"brightness": 1.0}}
+    cfg = {**DEFAULTS, "api": {"api_key": "secret"}, "render": {"brightness": 1.0}}
     return t, c, create_app(c, cfg)
 
 
@@ -99,7 +99,7 @@ def setup():
 async def test_api_flow(setup):
     t, c, app = setup
     await c.start()
-    h = {"X-API-Key": "geheim"}
+    h = {"X-API-Key": "secret"}
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
         r = await ac.get("/api/status")
         assert r.status_code == 401
@@ -115,13 +115,13 @@ async def test_api_flow(setup):
         da = [w for w in t.writes[n:] if w[1] == 0xDA]
         assert [len(w) for w in da] == [242] * 5 + [20]
         d0 = [w for w in t.writes[n:] if w[1] == 0xD0]
-        assert [w[6] for w in d0] == [0x03, 0x00, 0x04, 0x01]   # volgorde uit de capture
+        assert [w[6] for w in d0] == [0x03, 0x00, 0x04, 0x01]   # order from the capture
         r = await ac.post("/api/test/pixel", json={"index": 21}, headers=h)
         assert r.json()["expected_xy"] == [1, 1]
-        r = await ac.post("/api/text", json={"text": "Hallo wereld dit is een test", "page_seconds": 0.1}, headers=h)
+        r = await ac.post("/api/text", json={"text": "Hello world this is a test", "page_seconds": 0.1}, headers=h)
         assert r.json()["frames"] >= 4 and r.json()["mode"] == "pages"
         r = await ac.post("/api/movement", json={"direction": "loop_left", "speed": 30}, headers=h)
-        assert r.json()["direction"] == 9 and t.writes[-1] == P.diy_mode(1, 9, 100, 30)
+        assert r.json()["direction"] == 9 and P.diy_mode(1, 9, 100, 30) in t.writes
         await asyncio.sleep(0.5)
         assert c.state["animation"] is not None
         r = await ac.post("/api/animation/stop", headers=h)
@@ -135,3 +135,51 @@ async def test_api_flow(setup):
         r = await ac.put("/api/layout", json={"width": 10, "height": 5, "serpentine": True, "save": False}, headers=h)
         assert c.layout.serpentine and c.layout.count == 50
     await c.close()
+
+
+@pytest.mark.asyncio
+async def test_input_guards(setup):
+    t, c, app = setup
+    await c.start()
+    h = {"X-API-Key": "secret"}
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+        r = await ac.post("/api/power", json={"on": True}, headers={**h, "Origin": "http://evil.example"})
+        assert r.status_code == 403
+        r = await ac.put("/api/layout", json={"pixel_count": 10**9, "save": False}, headers=h)
+        assert r.status_code == 422
+        r = await ac.put("/api/layout", json={"order": "diagonal", "save": False}, headers=h)
+        assert r.status_code == 422
+        r = await ac.post("/api/text", json={"text": "x", "font_size": 5000}, headers=h)
+        assert r.status_code == 422
+        r = await ac.post("/api/text", json={"text": "x" * 500}, headers=h)
+        assert r.status_code == 422
+        big = io.BytesIO(); Image.new("RGB", (R.MAX_IMAGE_DIMENSION + 1, 1)).save(big, "PNG")
+        r = await ac.post("/api/image", files={"file": ("b.png", big.getvalue(), "image/png")}, headers=h)
+        assert r.status_code == 400
+    await c.close()
+
+
+@pytest.mark.asyncio
+async def test_host_allowlist_without_key():
+    c = FairyCurtain(FakeTransport(), Layout(), keepalive_interval=0)
+    app = create_app(c, {**DEFAULTS, "api": {"api_key": None, "allowed_hosts": ["pi.local"]}, "render": {}})
+    for host, code in (("evil.example", 403), ("pi.local:8321", 200), ("192.168.1.5:8321", 200), ("localhost", 200)):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=f"http://{host}") as ac:
+            assert (await ac.get("/health")).status_code == code, host
+
+
+def test_check_ip_blocks_internal_targets():
+    from fairycurtain.netsafe import check_ip
+    for a in ["127.0.0.1", "::ffff:127.0.0.1", "169.254.169.254", "0.1.2.3", "::1", "224.0.0.1", "240.0.0.1"]:
+        with pytest.raises(ValueError):
+            check_ip(a)
+    check_ip("192.168.1.50")  # LAN stays allowed
+
+
+@pytest.mark.asyncio
+async def test_fetch_image_refuses_bad_urls():
+    pytest.importorskip("aiohttp")
+    from fairycurtain.netsafe import fetch_image
+    for url in ("http://127.0.0.1/x.png", "http://169.254.169.254/latest", "file:///etc/passwd"):
+        with pytest.raises(ValueError):
+            await fetch_image(url)

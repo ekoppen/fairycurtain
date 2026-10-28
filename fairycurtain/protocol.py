@@ -1,34 +1,34 @@
 """
-Hello Fairy BLE-protocol.
+Hello Fairy BLE protocol.
 
-Pakketformaat (bevestigd door meerdere reverse-engineering projecten):
+Packet format (confirmed by several reverse-engineering projects):
 
     AA  CMD  LEN  PAYLOAD...  CS
 
-    CS = (som van alle voorgaande bytes) & 0xFF
+    CS = (sum of all preceding bytes) & 0xFF
 
-Bevestigde commando's:
-    aan/uit     AA 02 01 01 AE  /  AA 02 01 00 AD
-    kleur (HSV) AA 03 07 01 HHHH SSSS VVVV CS   (H 0-359, S/V 0-1000, big-endian)
+Confirmed commands:
+    power on/offAA 02 01 01 AE  /  AA 02 01 00 AD
+    color (HSV) AA 03 07 01 HHHH SSSS VVVV CS   (H 0-359, S/V 0-1000, big-endian)
     preset      AA 03 04 02 PP VVVV CS         (PP 1-58, V 0-1000)
     ACK         AA 02 00 AC  /  AA 03 00 AD
 
-Per-pixel ("DIY"/afbeelding) modus  — BEVESTIGD (kmich, btsnoop-capture van
-de officiële app + APK, fysiek getest op een 20x20-gordijn):
+Per-pixel ("DIY"/image) mode — CONFIRMED (kmich, btsnoop capture of
+the official app + APK, physically tested on a 20x20 curtain):
 
-    * per pixel één kleurbyte: 0..180 = tint (hue/2), 254 = uit, 255 = wit
-      (geen helderheid/verzadiging per pixel; wel globaal via D0)
-    * index = kolom*20 + rij  (slierten van boven naar beneden)
-    * volgorde:  D0(03)  D0(00)  →250ms→  6x DA (79 px, 242 bytes, 300ms apart)
+    * one color byte per pixel: 0..180 = hue (hue/2), 254 = off, 255 = white
+      (no per-pixel brightness/saturation; brightness is global via D0)
+    * index = column*20 + row  (strands run top to bottom)
+    * sequence:  D0(03)  D0(00)  →250ms→  6x DA (79 px, 242 bytes, 300ms apart)
                  →1.2s→  D0(04)  D0(01)
-    * DA-payload = [01, idx_hi, idx_lo, kleur]*79.  Kleinere pakketten werken
-      NIET: het gordijn houdt dan alleen het laatste pakket. MTU >= 245 nodig.
-    * D0-payload = [richting, helderheid 0-100, snelheid 0-100, actie]
-      richting: 0 stil, 1-4 omhoog/omlaag/links/rechts, 5 knipper, 6 adem,
-      7-10 lus omhoog/omlaag/links/rechts.  actie 1 = plaatje tonen.
+    * DA-payload = [01, idx_hi, idx_lo, kleur]*79.  Smaller packets do NOT
+      work: the curtain then keeps only the last packet. MTU >= 245 required.
+    * D0-payload = [direction, brightness 0-100, speed 0-100, action]
+      direction: 0 still, 1-4 up/down/left/right, 5 blink, 6 breathe,
+      7-10 loop up/down/left/right.  action 1 = show picture.
 
-De eerdere gissingen (indexed_da met RGB, plain_rgb) staan nog als "legacy"
-encoders voor experimenten; het gordijn negeert ze stil (geen ACK).
+The earlier guesses (indexed_da with RGB, plain_rgb) remain as "legacy"
+encoders for experiments; the curtain silently ignores them (no ACK).
 """
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ DEVICE_NAME_PREFIX = "Hello Fairy-"
 ACK_POWER = bytes([0xAA, 0x02, 0x00, 0xAC])
 ACK_COLOR = bytes([0xAA, 0x03, 0x00, 0xAD])
 
-# Init-reeks zoals de officiële app die stuurt na verbinden (uit blecontroller).
-# Niet verplicht voor aan/uit/kleur; mogelijk wel voor pixel-modus.
+# Init sequence as sent by the official app after connecting (from blecontroller).
+# Not required for power/color; possibly needed for pixel mode.
 INIT_PACKETS = [
     bytes.fromhex("AA0000AA"),
     bytes.fromhex("AA0100AB"),
@@ -62,7 +62,7 @@ INIT_PACKETS = [
     bytes.fromhex("AAAF0059"),
 ]
 
-# Namen van een aantal presets (nummers 1-58 werken allemaal).
+# Names of some presets (numbers 1-58 all work).
 PRESETS = {
     8: "Blue with Pink Sparkle",
     17: "Fireworks",
@@ -90,7 +90,7 @@ def packet(cmd: int, payload: bytes = b"") -> bytes:
     return body + bytes([checksum(body)])
 
 
-# ---------------------------------------------------------------- basis ----
+# ---------------------------------------------------------------- basics ----
 
 def power(on: bool) -> bytes:
     return packet(CMD_POWER, bytes([0x01 if on else 0x00]))
@@ -110,7 +110,7 @@ def rgb_to_hsv1000(r: int, g: int, b: int) -> Tuple[int, int, int]:
 
 
 def color_rgb(r: int, g: int, b: int, brightness: Optional[int] = None) -> bytes:
-    """RGB → HSV-commando. brightness (0-100) overschrijft V indien gegeven."""
+    """RGB → HSV command. brightness (0-100) overrides V if given."""
     h, s, v = rgb_to_hsv1000(r, g, b)
     if brightness is not None:
         v = max(0, min(100, int(brightness))) * 10
@@ -125,7 +125,7 @@ def preset(number: int, brightness: int = 100) -> bytes:
 
 
 def time_sync(unix_ts: int) -> bytes:
-    """AA 05 07 <ts:4> 00 00 F0 — vorm afgeleid van app-capture, functie onzeker."""
+    """AA 05 07 <ts:4> 00 00 F0 — shape derived from app capture, purpose uncertain."""
     return packet(0x05, struct.pack(">I", unix_ts) + bytes([0x00, 0x00, 0xF0]))
 
 
@@ -136,8 +136,8 @@ PixelEncoder = Callable[[Sequence[RGB], int], List[bytes]]
 
 def encode_pixels_indexed_da(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes]:
     """
-    AA DA LEN PAGE [IDX_HI IDX_LO R G B]* CS   — formaat uit `blecontroller`.
-    Chunkgrootte volgt de MTU (max payload 255).
+    AA DA LEN PAGE [IDX_HI IDX_LO R G B]* CS   — format from `blecontroller`.
+    Chunk size follows the MTU (max payload 255).
     """
     max_payload = min(255, mtu - 7)
     per_chunk = max(1, (max_payload - 1) // 5)
@@ -153,8 +153,8 @@ def encode_pixels_indexed_da(pixels: Sequence[RGB], mtu: int = 247) -> List[byte
 
 def encode_pixels_plain_rgb(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes]:
     """
-    Alternatief (onbevestigd): AA DA LEN PAGE [R G B]* CS zonder index per pixel.
-    Handig als tweede kandidaat bij het testen.
+    Alternative (unconfirmed): AA DA LEN PAGE [R G B]* CS without a per-pixel index.
+    Useful as a second candidate when testing.
     """
     max_payload = min(255, mtu - 7)
     per_chunk = max(1, (max_payload - 1) // 3)
@@ -167,14 +167,14 @@ def encode_pixels_plain_rgb(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes
 
 
 PIXEL_ENCODERS: dict[str, PixelEncoder] = {
-    "diy": None,  # type: ignore  # wordt hieronder ingevuld (bevestigd formaat)
+    "diy": None,  # type: ignore  # filled in below (confirmed format)
     "legacy_indexed_da": encode_pixels_indexed_da,
     "legacy_plain_rgb": encode_pixels_plain_rgb,
 }
 
 
 
-# ----------------------------------------------------------- DIY (echt) ----
+# ----------------------------------------------------------- DIY (real) ----
 
 CMD_DIY_MODE = 0xD0
 CMD_DIY_DATA = 0xDA
@@ -188,7 +188,7 @@ DIRECTIONS = {"still": 0, "up": 1, "down": 2, "left": 3, "right": 4, "blink": 5,
 
 
 def rgb_to_pixel_byte(r: int, g: int, b: int, off_below: float = 0.05, white_below: float = 0.10) -> int:
-    """RGB → één DIY-kleurbyte (tint). Donker → uit, onverzadigd → wit."""
+    """RGB → one DIY color byte (hue). Dark → off, unsaturated → white."""
     hf, sf, vf = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
     if vf <= off_below:
         return PIXEL_OFF
@@ -198,7 +198,7 @@ def rgb_to_pixel_byte(r: int, g: int, b: int, off_below: float = 0.05, white_bel
 
 
 def pixel_byte_to_rgb(c: int) -> RGB:
-    """Omgekeerde (voor preview): wat het gordijn ongeveer laat zien."""
+    """Inverse (for preview): roughly what the curtain shows."""
     if c == PIXEL_OFF:
         return (0, 0, 0)
     if c == PIXEL_WHITE:
@@ -208,18 +208,18 @@ def pixel_byte_to_rgb(c: int) -> RGB:
 
 
 def diy_mode(action: int, direction: int = 0, brightness: int = 100, speed: int = 100) -> bytes:
-    """D0: [richting, helderheid, snelheid, actie]. Capture gebruikte 00 64 64 xx."""
+    """D0: [direction, brightness, speed, action]. Capture used 00 64 64 xx."""
     return packet(CMD_DIY_MODE, bytes([direction & 0xFF, max(0, min(100, brightness)),
                                        max(0, min(100, speed)), action & 0xFF]))
 
 
 def encode_pixels_diy(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes]:
     """
-    400 RGB-pixels (op fysieke index) → precies 6 DA-pakketten (5x242 + 1x20 bytes).
-    Let op: moet in exact deze chunks; zie docstring bovenaan.
+    400 RGB pixels (by physical index) → exactly 6 DA packets (5x242 + 1x20 bytes).
+    Note: must be sent in exactly these chunks; see the docstring at the top.
     """
     if mtu < DIY_MIN_MTU:
-        raise ValueError(f"DIY-upload heeft MTU >= {DIY_MIN_MTU} nodig (nu {mtu})")
+        raise ValueError(f"DIY upload needs MTU >= {DIY_MIN_MTU} (currently {mtu})")
     out: List[bytes] = []
     for start in range(0, len(pixels), DIY_PIXELS_PER_PACKET):
         chunk = pixels[start:start + DIY_PIXELS_PER_PACKET]
@@ -231,7 +231,7 @@ def encode_pixels_diy(pixels: Sequence[RGB], mtu: int = 247) -> List[bytes]:
 
 
 def parse_info(data: bytes) -> Optional[dict]:
-    """Antwoord op AA 00 00 AA: versie, aantal LED's, kolommen, rijen, DIY-type."""
+    """Reply to AA 00 00 AA: version, LED count, columns, rows, DIY type."""
     if len(data) < 4 or data[0] != PREFIX or data[1] != 0x00:
         return None
     pl = data[3:3 + data[2]]
@@ -247,12 +247,12 @@ def parse_info(data: bytes) -> Optional[dict]:
 PIXEL_ENCODERS["diy"] = encode_pixels_diy
 
 
-# ---------------------------------------------------------- notificaties ----
+# ---------------------------------------------------------- notifications ----
 
 @dataclass
 class Status:
     power: Optional[bool] = None
-    mode: Optional[int] = None          # 1 = kleur, 2 = preset
+    mode: Optional[int] = None          # 1 = color, 2 = preset
     h: Optional[int] = None
     s: Optional[int] = None             # 0-1000
     v: Optional[int] = None             # 0-1000
@@ -262,7 +262,7 @@ class Status:
 
 
 def parse_notification(data: bytes) -> Optional[Status]:
-    """Geeft Status terug voor statusmeldingen, None voor ACKs/onbekend."""
+    """Returns Status for status messages, None for ACKs/unknown."""
     if len(data) == 4 and data[0] == PREFIX and data[2] == 0:
         return None  # ACK
     if len(data) < 8 or data[0] != PREFIX:

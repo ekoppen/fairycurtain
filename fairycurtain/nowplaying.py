@@ -1,31 +1,31 @@
 """
-"Now playing": abonneer op een muziekbron en toon de albumhoes (en/of
-artiest/titel) op het gordijn zodra het nummer wisselt.
+"Now playing": follow a music source and show the album art (and/or
+artist/title) on the curtain whenever the track changes.
 
-Bronnen (config.yaml → nowplaying.source):
+Sources (config.yaml → nowplaying.source):
 
-  http           pollt een JSON-endpoint (RetroHead, HSS, eigen apps, …)
-  homeassistant  leest een media_player-entity via de HA REST-API
-  mqtt           luistert op een topic met JSON (bijv. vanuit HA of Node-RED)
+  http           polls a JSON endpoint (your own app, any music API, …)
+  homeassistant  reads a media_player entity via the HA REST API
+  mqtt           listens on a topic with JSON (e.g. from HA or Node-RED)
 
-De velden worden uit de JSON gehaald met simpele paden ("a.b[0].c").
-Voorbeeld voor een eigen app:
+Fields are extracted from the JSON with simple paths ("a.b[0].c").
+Example for your own app:
 
 nowplaying:
   enabled: true
   source: http
-  url: http://retrohead.local/api/now-playing
-  interval: 5                 # seconden
+  url: http://music.local/api/now-playing
+  interval: 5                 # seconds
   paths:
     title:  track.title
     artist: track.artist
-    image:  track.cover_url   # absolute URL, of relatief t.o.v. url
-    playing: state            # optioneel; waarde "playing" / true
-  show: cover                 # cover | text | both  (both = eerst tekst, dan hoes)
+    image:  track.cover_url   # absolute URL, or relative to url
+    playing: state            # optional; value "playing" / true
+  show: cover                 # cover | text | both  (both = text first, then cover)
   text_seconds: 6
   fit: cover
-  movement: still             # bv. loop_left om de hoes te laten bewegen
-  idle: keep                  # keep | off | clear  als er niets speelt
+  movement: still             # e.g. loop_left to make the cover move
+  idle: keep                  # keep | off | clear  when nothing is playing
 """
 from __future__ import annotations
 
@@ -38,12 +38,13 @@ from urllib.parse import urljoin
 
 from . import render as R
 from .device import FairyCurtain
+from .netsafe import fetch_image
 
 log = logging.getLogger("fairycurtain.nowplaying")
 
 
 def jpath(obj: Any, path: str) -> Any:
-    """Haal 'a.b[0].c' uit een JSON-object; None als het pad niet bestaat."""
+    """Extract 'a.b[0].c' from a JSON object; None if the path does not exist."""
     if not path:
         return None
     cur = obj
@@ -125,29 +126,31 @@ class NowPlaying:
         a = st.get("attributes", {})
         pic = a.get("entity_picture")
         if pic and pic.startswith("/"):
-            pic = base + pic  # lokale HA-proxy-URL; token nodig bij ophalen
+            pic = base + pic  # local HA proxy URL; token needed when fetching
         return {"title": a.get("media_title"), "artist": a.get("media_artist"),
                 "image": pic, "playing": st.get("state") == "playing"}
 
     async def _fetch_image(self, url: str) -> bytes:
         import base64
         if url.startswith("data:"):
-            return base64.b64decode(url.split(",", 1)[-1])
-        s = await self._http()
+            data = base64.b64decode(url.split(",", 1)[-1])
+            if len(data) > R.MAX_IMAGE_BYTES:
+                raise ValueError("image too large")
+            return data
         headers = {}
+        trusted = False
         if self.cfg.get("source") == "homeassistant" and url.startswith(self.cfg["ha_url"].rstrip("/")):
             headers["Authorization"] = f"Bearer {self.cfg['ha_token']}"
-        async with s.get(url, headers=headers) as r:
-            r.raise_for_status()
-            return await r.read()
+            trusted = True  # the admin's own HA instance (may be on loopback); other URLs are guarded
+        return await fetch_image(url, headers, trusted=trusted)
 
     # ---------------------------------------------------------------- loop
     async def _run(self) -> None:
         source = self.cfg.get("source", "http")
         if source == "mqtt":
-            return  # MQTT-bron wordt gevoed via handle_mqtt() vanuit mqtt.py
+            return  # the MQTT source is fed via handle_mqtt() from mqtt.py
         interval = float(self.cfg.get("interval", 5))
-        log.info("Now playing: bron %s, %s", source, self.cfg.get("url") or self.cfg.get("entity_id") or "", )
+        log.info("Now playing: source %s, %s", source, self.cfg.get("url") or self.cfg.get("entity_id") or "", )
         while True:
             try:
                 if self.enabled:
@@ -159,12 +162,12 @@ class NowPlaying:
             except Exception as e:
                 msg = f"{type(e).__name__}: {e}"
                 if msg != self._last_err:
-                    log.warning("nowplaying: bron %s niet leesbaar: %s", self.cfg.get("url") or source, msg)
+                    log.warning("nowplaying: source %s not readable: %s", self.cfg.get("url") or source, msg)
                     self._last_err = msg
             await asyncio.sleep(interval)
 
     async def handle_mqtt(self, payload: str) -> None:
-        """Voor source: mqtt — payload is JSON; zelfde 'paths' als bij http."""
+        """For source: mqtt — payload is JSON; same 'paths' as for http."""
         if not self.enabled:
             return
         try:
@@ -184,14 +187,14 @@ class NowPlaying:
         playing = playing in (True, "playing", "play", 1, "1", "true", "True") if playing is not None else True
         key = f"{info.get('artist')}|{info.get('title')}|{info.get('image')}|{playing}"
         if not self.c.master_on:
-            self._key = None       # zodat het na 'Aan' meteen opnieuw getoond wordt
+            self._key = None       # so it is shown again right after 'On'
             self.current = {**info, "playing": playing}
             return
         if key == self._key:
             return
         self._key = key
         self.current = {**info, "playing": playing}
-        log.info("Now playing: %s – %s (%s)", info.get("artist"), info.get("title"), "speelt" if playing else "stil")
+        log.info("Now playing: %s – %s (%s)", info.get("artist"), info.get("title"), "playing" if playing else "idle")
         if not playing:
             idle = self.cfg.get("idle", "keep")
             if idle == "off":
@@ -218,7 +221,7 @@ class NowPlaying:
                 await self.c.play(frames, loop=True, name="nowplaying:text", source=("nowplaying", label))
                 return
             await self.c.play(frames, loop=False, name="nowplaying:text", source=("nowplaying", label))
-            # wachten tot de tekst-animatie klaar is
+            # wait until the text animation has finished
             while self.c.state.get("animation"):
                 await asyncio.sleep(0.5)
         if info.get("image"):
@@ -228,4 +231,4 @@ class NowPlaying:
                                              brightness=float(self.cfg.get("brightness", 1.0)))
                 await self.c.show_grid(grid, source=("nowplaying", label))
             except Exception as e:
-                log.warning("Hoes ophalen/tonen mislukt: %s", e)
+                log.warning("Fetching/showing cover failed: %s", e)

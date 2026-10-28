@@ -1,7 +1,9 @@
 [project]
 name = "fairycurtain"
 version = "1.0.0"
-description = "Hello Fairy BLE LED-gordijn aansturen via REST API, webeditor en MQTT/Home Assistant"
+description = "Control a Hello Fairy BLE LED curtain via REST API, web editor and MQTT/Home Assistant"
+readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
   "bleak>=0.21",
